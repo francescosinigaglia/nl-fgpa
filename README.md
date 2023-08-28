@@ -7,4 +7,4 @@ In partcular, we make available the piece of code related to the novel Non-Local
 The currently-implemented model parameters work for the specific case studied in the paper. If one wants to apply it to a different, parameters should be recalibrated. 
 
 Set the number of threads (e.g. 4) used in numba parallelization by specifying the environmetal parameter:
-NUMBA_NUM_THREADS = 4 
+export NUMBA_NUM_THREADS = 4 
