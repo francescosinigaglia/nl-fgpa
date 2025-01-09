@@ -201,27 +201,43 @@ def get_cic(posx, posy, posz, lbox, ngrid):
 
         if wxc <=0.5:
             indxl = indxc - 1
+            if indxl<0:
+                indxl += ngrid
             wxc += 0.5
             wxl = 1 - wxc
         elif wxc >0.5:
             indxl = indxc + 1
-            wxl = 1 - wxc
+            if indxl>=ngrid:
+                indxl -= ngrid
+            wxl = wxc - 0.5
+            wxc = 1 - wxl
 
         if wyc <=0.5:
             indyl = indyc - 1
+            if indyl<0:
+                indyl += ngrid
             wyc += 0.5
             wyl = 1 - wyc
         elif wyc >0.5:
             indyl = indyc + 1
-            wyl = 1 - wyc
+            if indyl>=ngrid:
+                indyl -= ngrid
+            wyl = wyc - 0.5
+            wyc = 1 - wyl
+            
 
         if wzc <=0.5:
             indzl = indzc - 1
+            if indzl<0:
+                indzl += ngrid
             wzc += 0.5
             wzl = 1 - wzc
         elif wzc >0.5:
             indzl = indzc + 1
-            wzl = 1 - wzc
+            if indzl>=ngrid:
+                indzl -= ngrid
+            wzl = wzc - 0.5
+            wzc = 1 - wzl
 
         delta[indxc,indyc,indzc] += wxc*wyc*wzc
         delta[indxl,indyc,indzc] += wxl*wyc*wzc
