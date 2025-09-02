@@ -32,21 +32,7 @@ aa = 1./(1.+redshift)
 num_part_per_cell = 8
 
 # RSD model parameters
-b1 = 3.
-beta1 =   0.5
-B1 =  -0.9 
 
-b2 = 2.                                                     
-beta2 =   0.5                                                    
-B2=  -0.8 
-
-b3 = 0.                                                             
-beta3 =   0.5                                                         
-B3 =  -1. 
-
-b4 = 0.                                                              
-beta4 =  0.5                                                    
-B4 = -0.5 
 
 # NL FGPA parameters                                                                                                                                                                                                                          
 aa1 = 0.23                                                                                                                           
@@ -259,13 +245,28 @@ def get_cic(posx, posy, posz, lbox, ngrid):
 # **********************************************
 # Real to redshift space mapping
 #@njit(parallel=False, cache=True)
-def real_to_redshift_space(delta, vel, tweb, ngrid, lbox) :
+def real_to_redshift_space(delta, vel, tweb, ngrid, lbox, rsd_pars) :
 
     H = H0*h*np.sqrt(Om*(1+redshift)**3 + Ol)
 
     xx = np.repeat(np.arange(ngrid), ngrid**2*num_part_per_cell)*lcell
     yy = np.tile(np.repeat(np.arange(ngrid), ngrid *num_part_per_cell), ngrid)*lcell
 
+    B1 = rsd_pars[0,0]
+    b1 = rsd_pars[0,1]
+    beta1 = rsd_pars[0,2]
+
+    B2 = rsd_pars[1,0]
+    b2 = rsd_pars[1,1]
+    beta2 = rsd_pars[1,2]
+
+    B3 = rsd_pars[2,0]
+    b3 = rsd_pars[2,1]
+    beta3 = rsd_pars[2,2]
+
+    B4 = rsd_pars[3,0]
+    b4 = rsd_pars[3,1]
+    beta4 = rsd_pars[3,2]
 
     #RSD model
     velarr = np.repeat(vel,num_part_per_cell)
@@ -559,6 +560,9 @@ def get_tidal_invariants(arr, ngrid, lbox):
 # **********************************************
 # **********************************************
 
+bias_pars = np.load('bias_pars.npy')
+rsd_pars = np.load('rsd_pars.npy')
+
 lcell = lbox/ngrid
 
 aa = 1./(1.+redshift)
@@ -590,7 +594,8 @@ phi = poisson_solver(delta,ngrid, lbox)
 
 # Compute T-web in redshift space
 print('Computing invariants of tidal field ...')
-tweb = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in redshift space
+tweb = get_tidal_invariants(phi, ngrid, lbox) # Now also the T-web is in redshift space
+dweb = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in redshift space
 
 
 print('===================')
@@ -608,7 +613,6 @@ print('===================')
 delta = delta.flatten()
 
 # Compute NL FGPA
-
 tau = 0. * delta.copy()
 tau = tau.flatten()
 

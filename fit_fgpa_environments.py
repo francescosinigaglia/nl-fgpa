@@ -12,13 +12,13 @@ zstring = '1.430'
 ngrid = 360
 lbox = 2000.
 
-dm_filename = '../../UCHUU/ALPT_DM_fields/deltaBOXOM0.314OL0.686G360V2000.0_ALPTrs6.000z%s.dat' %zstring
-tweb_filename = '../../UCHUU/ALPT_DM_fields/Tweb_OM0.314OL0.686G360V2000.0_ALPTrs6.000z%s.dat' %zstring
-twebdelta_filename = '../../UCHUU/ALPT_DM_fields/TwebDelta_OM0.314OL0.686G360V2000.0_ALPTrs6.000z%s.dat' %zstring 
-gal_filename = 'Uchuu_NGP_real_space_z%s.dat' %zstring
+dm_filename = '...' 
+tweb_filename = '...' 
+twebdelta_filename = '...' 
+gal_filename = '...'
 
-out_filename = 'UCHUU_mock_BGS_NGP_real_space_z%s.DAT' %zstring
-outpars_filename = 'bias_parameters_z%s.npy' %zstring 
+out_filename = '...' 
+outpars_filename = '...'
 
 twebenvs = [1,2,3,4]
 twebdeltaenvs = [1,2,3,4]
