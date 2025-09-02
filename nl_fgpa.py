@@ -619,13 +619,17 @@ delta = delta.flatten()
 tau = 0. * delta.copy()
 tau = tau.flatten()
 
-delta[np.where(tweb==4)] += norm*np.random.negative_binomial(nn, pp, size=len(delta[np.where(tweb==4)]))
+#if use_negbin == True:
+#delta[np.where(tweb==4)] += norm*np.random.negative_binomial(nn, pp, size=len(delta[np.where(tweb==4)]))
 
-tau[np.where(tweb==1)] = aa1 * (1+delta[np.where(tweb==1)])**alpha1 * np.exp(-delta[np.where(tweb==1)]/delta11) * np.exp(delta[np.where(tweb==1)]/delta12)
-tau[np.where(tweb==2)] = aa2 * (1+delta[np.where(tweb==2)])**alpha2 * np.exp(-delta[np.where(tweb==2)]/delta21) * np.exp(delta[np.where(tweb==2)]/delta22)
-tau[np.where(tweb==3)] = aa3 * (1+delta[np.where(tweb==3)])**alpha3 * np.exp(-delta[np.where(tweb==3)]/delta31) * np.exp(delta[np.where(tweb==3)]/delta32)
-tau[np.where(tweb==4)] = aa4 * (1+delta[np.where(tweb==4)])**alpha4 * np.exp(-delta[np.where(tweb==4)]/delta41) * np.exp(delta[np.where(tweb==4)]/delta42) #+ norm*np.random.negative_binomial(nn, pp, size=len(delta[np.where(tweb==4)]))
-tau[np.where(tau<0)] = 0.
+for ii in range(1,5):
+    for jj in range(1,5):
+        aa = bias_pars[ii,jj,0]
+        alpha = bias_pars[ii,jj,1]
+        rho = bias_pars[ii,jj,2] 
+        eps = bias_pars[ii,jj,3] 
+        tau[np.where(np.logical_and(tweb==ii,dweb==jj))] = aa * (1+delta[np.where(np.logical_and(tweb==ii,dweb==jj))])**alpha * np.exp(-delta[np.where(np.logical_and(tweb==ii,dweb==jj))]/rho)
+
 flux_new = np.exp(-tau)
 flux_new = np.reshape(flux_new, (ngrid,ngrid,ngrid))
 
