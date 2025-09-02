@@ -28,7 +28,7 @@ Ok = 0.
 N_eff = 3.046
 w_eos = -1
 Ol = 1-Om-Ok-Orad
-aa = 1./(1.+zz)
+aa = 1./(1.+redshift)
 num_part_per_cell = 8
 
 # RSD model parameters
@@ -70,6 +70,8 @@ delta42 = 0.25
 norm = 1.4
 nn = 0.1
 pp = 0.6
+
+lambdath = 0.1 
 
 # Random seed for stochasticity reproducibility
 np.random.seed(123456)
@@ -187,17 +189,19 @@ def get_cic(posx, posy, posz, lbox, ngrid):
 
     delta = np.zeros((ngrid,ngrid,ngrid))
 
+    lcell = lbox / ngrid
+
     for ii in prange(ngrid**3):
         xx = posx[ii]
         yy = posy[ii]
         zz = posz[ii]
-        indxc = int(xx/lbox)
-        indyc = int(yy/lbox)
-        indzc = int(zz/lbox)
+        indxc = int(xx/lcell)
+        indyc = int(yy/lcell)
+        indzc = int(zz/lcell)
 
-        wxc = xx/lbox - indxc
-        wyc = yy/lbox - indyc
-        wzc = zz/lbox - indzc
+        wxc = xx/lcell - indxc
+        wyc = yy/lcell - indyc
+        wzc = zz/lcell - indzc
 
         if wxc <=0.5:
             indxl = indxc - 1
@@ -257,7 +261,7 @@ def get_cic(posx, posy, posz, lbox, ngrid):
 #@njit(parallel=False, cache=True)
 def real_to_redshift_space(delta, vel, tweb, ngrid, lbox) :
 
-    H = H0*h*np.sqrt(Om*(1+zz)**3 + Ol)
+    H = H0*h*np.sqrt(Om*(1+redshift)**3 + Ol)
 
     xx = np.repeat(np.arange(ngrid), ngrid**2*num_part_per_cell)*lcell
     yy = np.tile(np.repeat(np.arange(ngrid), ngrid *num_part_per_cell), ngrid)*lcell
@@ -531,13 +535,13 @@ def get_tidal_invariants(arr, ngrid, lbox):
                 lambda1[ii,jj,kk] = eigs[0]
                 lambda2[ii,jj,kk] = eigs[1]
                 lambda3[ii,jj,kk] = eigs[2]
-                if eigs[0]>=0 and eigs[1]>=0 and eigs[2]>=0:
+                if eigs[0]>=lambdath and eigs[1]>=lambdath and eigs[2]>=lambdath:
                     tweb[ii,jj,kk] = 1
-                elif eigs[0]>=0 and eigs[1]>=0 and eigs[2]<0:
+                elif eigs[0]>=lambdath and eigs[1]>=lambdath and eigs[2]<lambdath:
                     tweb[ii,jj,kk] = 2
-                elif eigs[0]>=0 and eigs[1]<0 and eigs[2]<0:
+                elif eigs[0]>=lambdath and eigs[1]<lambdath and eigs[2]<lambdath:
                     tweb[ii,jj,kk] = 3
-                elif eigs[0]<0 and eigs[1]<0 and eigs[2]<0:
+                elif eigs[0]<lambdath and eigs[1]<lambdath and eigs[2]<lambdath:
                     tweb[ii,jj,kk] = 4
 
     # Now compute invariants
