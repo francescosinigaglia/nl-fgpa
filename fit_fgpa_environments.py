@@ -21,8 +21,8 @@ vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 out_filename = '...' 
 outpars_filename = '...'
 
-twebenvs = [1,2,3,4]
-twebdeltaenvs = [1,2,3,4]
+twebenvs = [1,2,3,4] # CW environments for the gravitational tidal field tensor (T-web)
+twebdeltaenvs = [1,2,3,4] # CW environments for the curvature tensor (delta-web)
 
 verbose_parameters = False
 
@@ -37,8 +37,8 @@ kkth_l2 = 0.3
 
 aa_bounds = (1e-3, 10)
 alpha_bounds = (0.01, 3.)
-rho_bounds = (0.3, 20.)
-eps_bounds = (0.1, 3.)
+rho_bounds = (-1., 20.)
+eps_bounds = (-3., 3.)
 bv_bounds = (0.5, 1.5)
 bb_bounds = (0., 1.5)
 beta_bounds = (0.5, 1.5)
