@@ -12,13 +12,11 @@ zstring = '2.000'
 ngrid = 256
 lbox = 500.
 
-lambdath = 0.
+lambdath = 0. # Eigenalues threshold for cosmic web classification
 
-dm_filename = '...' 
-tweb_filename = '...' 
-twebdelta_filename = '...' 
-flux_filename = '...'
-vz_filename = '...'
+dm_filename = 'DensityDM.z2_0.sim2.n256.rspace.dat' 
+flux_filename = 'fluxz.z2_0.sim2.n256.zspace.dat'
+vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 
 out_filename = '...' 
 outpars_filename = '...'
@@ -47,12 +45,13 @@ beta_bounds = (0.5, 1.5)
 
 npars = 7
 
-bounds = np.array([alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
+bounds = np.array([aa_bounds, alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
 bestfit = np.array([1., 1., 1., 1., 1., 1., 1. ]) # z=3.0
 
 fit = True
 
-parslist = []
+prec = np.float64
+
 
 # ***********************************
 # ***********************************
@@ -189,40 +188,47 @@ def trilininterp(xx, yy, zz, arrin, lbox, ngrid):
 
 # ********************************
 @njit(parallel=True, fastmath=True, cache=True)
-def real_to_redshift_space(delta, posx, posy, posz, vz, ngrid, lbox, bv, bb, betarsd, gamma):
+def real_to_redshift_space(delta, vz, ngrid, lbox, bv, bb, betarsd, gamma):
 
     lcell = lbox/ ngrid
 
+    posx = np.zeros(ngrid**3)
+    posy = np.zeros(ngrid**3)
+    posz = np.zeros(ngrid**3)
+
     # Parallelize the outer loop                                                                                                                                                                            
-    for ii in prange(len(posx)):
-
-        # Initialize positions at the centre of the cell                                                                                                                                                    
-        xtmp = posx[ii]
-        ytmp = posy[ii]
-        ztmp = posz[ii]
-
-        indx = int(xtmp/lcell)
-        indy = int(ytmp/lcell)
-        indz = int(ztmp/lcell)
-
-        ind3d = indz+ngrid*(indy+ngrid*indx)
-
-        sigma = bb*(1. + delta[indx,indy,indz])**betarsd
-
-        vzrand = np.random.normal(0,sigma)
-        vzrand = np.sign(vzrand) * abs(vzrand) ** gamma
-        vztmp = trilininterp(xtmp, ytmp, ztmp, vz, lbox, ngrid)
+    for ii in prange(ngrid):
+        for jj in prange(ngrid):
+            for kk in range(ngrid):
+                
+                # Initialize positions at the centre of the cell                                                                                                                                                    
+                xtmp = lcell*(ii+0.5)
+                ytmp = lcell*(jj+0.5)
+                ztmp = lcell*(kk+0.5)
+                
+                indx = int(xtmp/lcell)
+                indy = int(ytmp/lcell)
+                indz = int(ztmp/lcell)
+                
+                ind3d = indz+ngrid*(indy+ngrid*indx)
+                
+                sigma = bb*(1. + delta[indx,indy,indz])**betarsd
+                vzrand = np.random.normal(0,sigma)
+                vzrand = np.sign(vzrand) * abs(vzrand) ** gamma
+                vztmp = trilininterp(xtmp, ytmp, ztmp, vz, lbox, ngrid)
         
-        vztmp += vzrand
+                vztmp += vzrand
 
-        ztmp = ztmp + bv * vztmp #/ (ascale * HH)
+                ztmp = ztmp + bv * vztmp #/ (ascale * HH)
 
-        if ztmp<0:
-            ztmp += lbox
-        elif ztmp>lbox:
-            ztmp -= lbox
+                if ztmp<0:
+                    ztmp += lbox
+                elif ztmp>lbox:
+                    ztmp -= lbox
 
-        posz[ii] = ztmp
+                posx[ind3d] = xtmp
+                posy[ind3d] = ytmp
+                posz[ind3d] = ztmp
 
     return posx, posy, posz
 
@@ -240,13 +246,12 @@ def get_power(fsignal, Nbin, kmax, dk, mumin, mumax, axis):
     for ii in prange(ngrid):
         for jj in range(ngrid):
             for kk in range(ngrid):
+
                 ktot = np.sqrt(k_squared_nohermite(lbox,ngrid,ii,jj,kk))
 
                 if ktot <= kmax:
 
                     k_par, k_per = get_k_par_per(lbox,ngrid,ii,jj,kk,axis)
-
-                    #print('Done kpar kper')
 
                     # find the value of mu
                     if ii==0 and jj==0 and kk==0:  
@@ -287,7 +292,7 @@ def get_power(fsignal, Nbin, kmax, dk, mumin, mumax, axis):
 
 # **********************************************
 @njit(cache=True)
-def get_k_par_per(lbox,ngrid,ii,jj,kk,axis):
+def get_k_par_per(lbox,ngrid,ii,jj,ll,axis):
 
     kfac = 2.0*np.pi/lbox
 
@@ -301,24 +306,27 @@ def get_k_par_per(lbox,ngrid,ii,jj,kk,axis):
     else:
         ky = -kfac*(ngrid-jj)
 
-    if kk <= ngrid/2:
-          kz = kfac*kk
+    if ll <= ngrid/2:
+        kz = kfac*ll
     else:
-          kz = -kfac*(ngrid-kk)
+        kz = -kfac*(ngrid-ll)
 
     # compute the value of k_par and k_perp
     if axis==0:   
-        k_par, k_per = kx, np.sqrt(ky*ky + kz*kz)
+        k_par = kx 
+        k_per = np.sqrt(ky*ky + kz*kz)
     elif axis==1: 
-        k_par, k_per = ky, np.sqrt(kx*kx + kz*kz)
-    else:         
-        k_par, k_per = kz, np.sqrt(kx*kx + ky*ky)
+        k_par = ky
+        k_per = np.sqrt(kx*kx + kz*kz)
+    else: 
+        k_par = kz
+        k_per = np.sqrt(kx*kx + ky*ky)
                                                                                                                
     return k_par, k_per
 
 # ***********************************
 # ***********************************
-def measure_spectrum(signal):
+def measure_spectrum_old(signal):
 
     nbin = round(ngrid/2)
     
@@ -331,9 +339,24 @@ def measure_spectrum(signal):
     kmode = np.zeros((nbin))
     power = np.zeros((nbin))
 
+    print(fsignal.shape)
+
     kmode, power, nmode = get_power(fsignal, nbin, kmax, dk, kmode, power, nmode)
     
     return kmode[1:], power[1:]
+
+def measure_spectrum(signal):
+
+    nbin = int(ngrid//2)
+    
+    fsignal = np.fft.fftn(signal) #np.fft.fftn(signal)
+
+    kmax = np.pi * ngrid / lbox * np.sqrt(3.) #np.sqrt(k_squared(L,nc,nc/2,nc/2,nc/2))
+    dk = kmax/nbin  # Bin width
+
+    kmode, power_l0, power_l2, power_l4, nmode = get_power(fsignal, nbin, kmax, dk, mumin, mumax, axis)
+
+    return kmode[1:], power_l0[1:], power_l2[1:], power_l4[1:] 
 
 # **********************************************
 @njit(parallel=True, cache=True)
@@ -355,7 +378,7 @@ def poisson_solver(delta, ngrid, lbox):
     delta = fftr2c(delta)
 
     delta = divide_by_k2(delta, ngrid, lbox)
-    
+
     delta[0,0,0] = 0.
 
     delta = fftc2r(delta)
@@ -770,19 +793,21 @@ def get_tidal_invariants(arr, ngrid, lbox):
 # ********************************
 # ********************************
 
+parslist = []
 
 if fit==True:
     plot_pk = False
 else:
     plot_pk = True
 
-delta = np.fromfile(dm_filename, dtype=np.float32)
+delta = np.fromfile(dm_filename, dtype=prec)
+delta = delta/np.mean(delta) - 1.
 delta = np.reshape(delta, (ngrid,ngrid,ngrid))
 
-vz = np.fromfile(vz_filename, dtype=np.float32)
+vz = np.fromfile(vz_filename, dtype=prec)
 vz = np.reshape(vz, (ngrid,ngrid,ngrid))
 
-fluxref = np.fromfile(flux_filename, dtype=np.float32)
+fluxref = np.fromfile(flux_filename, dtype=prec)
 fluxref = np.reshape(fluxref, (ngrid,ngrid,ngrid))
 
 # Do T-web and Tweb-delta computaiton just once
@@ -795,7 +820,14 @@ print('Computing invariants of tidal field ...')
 tweb = get_tidal_invariants(delta, ngrid, lbox)
 
 # Map density field from real to redshift space
-delta = real_to_redshift_space(delta, vz, ngrid, lbox, -0.9, 2.0, 0.5, 1.0) # Now delta is in redshift space
+posx, posy, posz = real_to_redshift_space(delta, vz, ngrid, lbox, -0.9, 2.0, 0.5, 1.0) # Now delta is in redshift space
+# Periodic BCs
+posz[posz<0.] += lbox
+posz[posz>=lbox] -= lbox
+
+delta = get_cic(posx, posy, posz, lbox, ngrid)
+delta = delta/np.mean(delta) - 1.
+print(delta.shape)
 
 # Solve Poisson equation in redshift space
 print('Solving Poisson equation ...')
