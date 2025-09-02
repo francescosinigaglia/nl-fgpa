@@ -18,8 +18,8 @@ dm_filename = 'DensityDM.z2_0.sim2.n256.rspace.dat'
 flux_filename = 'fluxz.z2_0.sim2.n256.zspace.dat'
 vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 
-out_filename = '...' 
-outpars_filename = '...'
+#out_filename = '...' 
+outpars_filename = 'bestfit_pars.npy'
 
 twebenvs = [1,2,3,4] # CW environments for the gravitational tidal field tensor (T-web)
 twebdeltaenvs = [1,2,3,4] # CW environments for the curvature tensor (delta-web)
