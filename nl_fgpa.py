@@ -14,6 +14,12 @@ vel_filename = '...'  # Real space
 
 out_filename = '...'  # Output filename
 
+bias_pars_filename = '...' # bias model parameters file
+rsd_pars_filename = '...' # RSD model parameters file
+
+kk_out_filename = '...' # k wavenumbers output filename for P(k)
+pk_out_filename = '...' # amplitude output filename for P(k)
+
 lbox = 500
 ngrid = 256 
 
@@ -30,9 +36,6 @@ w_eos = -1
 Ol = 1-Om-Ok-Orad
 aa = 1./(1.+redshift)
 num_part_per_cell = 8
-
-# RSD model parameters
-
 
 # NL FGPA parameters                                                                                                                                                                                                                          
 aa1 = 0.23                                                                                                                           
@@ -332,50 +335,50 @@ def poisson_solver(delta, ngrid, lbox):
 @njit(cache=True)
 def k_squared(lbox,ngrid,ii,jj,kk):
     
-      kfac = 2.0*np.pi/lbox
+    kfac = 2.0*np.pi/lbox
 
-      if ii <= ngrid/2:
+    if ii <= ngrid/2:
         kx = kfac*ii
-      else:
+    else:
         kx = -kfac*(ngrid-ii)
       
-      if jj <= ngrid/2:
+    if jj <= ngrid/2:
         ky = kfac*jj
-      else:
+    else:
         ky = -kfac*(ngrid-jj)
       
-      #if kk <= nc/2:
-      kz = kfac*kk
-      #else:
-      #  kz = -kfac*np.float64(nc-k)
+    #if kk <= nc/2:
+    kz = kfac*kk
+    #else:
+    #  kz = -kfac*np.float64(nc-k)
       
-      k2 = kx**2+ky**2+kz**2
+    k2 = kx**2+ky**2+kz**2
 
-      return k2
+    return k2
 
 @njit(cache=True)
 def k_squared_nohermite(lbox,ngrid,ii,jj,kk):
 
-      kfac = 2.0*np.pi/lbox
+    kfac = 2.0*np.pi/lbox
 
-      if ii <= ngrid/2:
+    if ii <= ngrid/2:
         kx = kfac*ii
-      else:
+    else:
         kx = -kfac*(ngrid-ii)
 
-      if jj <= ngrid/2:
+    if jj <= ngrid/2:
         ky = kfac*jj
-      else:
+    else:
         ky = -kfac*(ngrid-jj)
 
-      if kk <= ngrid/2:
+    if kk <= ngrid/2:
           kz = kfac*kk
-      else:
+    else:
           kz = -kfac*(ngrid-kk)                                                                                                           
 
-      k2 = kx**2+ky**2+kz**2
+    k2 = kx**2+ky**2+kz**2
 
-      return k2
+    return k2
 
 # **********************************************
 @njit(parallel=True, cache=True)
@@ -560,8 +563,8 @@ def get_tidal_invariants(arr, ngrid, lbox):
 # **********************************************
 # **********************************************
 
-bias_pars = np.load('bias_pars.npy')
-rsd_pars = np.load('rsd_pars.npy')
+bias_pars = np.load(bias_pars_filename)
+rsd_pars = np.load(rsd_pars_filename)
 
 lcell = lbox/ngrid
 
@@ -628,3 +631,8 @@ flux_new = np.reshape(flux_new, (ngrid,ngrid,ngrid))
 
 (flux_new.flatten()).astype('float32').tofile(out_filename)
 
+# Measure power spectrum
+kk, pk = measure_spectrum(flux_new)
+
+np.save(kk_out_filename, kk)
+np.save(pk_out_filename, pk)
