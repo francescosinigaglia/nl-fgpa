@@ -37,29 +37,6 @@ Ol = 1-Om-Ok-Orad
 aa = 1./(1.+redshift)
 num_part_per_cell = 8
 
-# NL FGPA parameters                                                                                                                                                                                                                          
-aa1 = 0.23                                                                                                                           
-aa2 = 0.1                                                                                                                
-aa3 = 0.2                                                                                                                      
-aa4 = 0.15
-alpha1 = 4.                                                                                                                          
-alpha2 = 4.                                                                                                                          
-alpha3 = 2.2                                                                                                                         
-alpha4 = 2.03                                                                                                                        
-                                                             
-delta11 = 1.36                                                                                                                       
-delta12 = 0.41                                                                                                                       
-delta21 = 0.9                                                                                                                        
-delta22 = 0.13                                                                                                           
-delta31 = 0.85                                                                                                                       
-delta32 = 0.6                                                                                                                   
-delta41 = 1.0                                                                                                                        
-delta42 = 0.25                                                                                                                   
-
-norm = 1.4
-nn = 0.1
-pp = 0.6
-
 lambdath = 0.1 
 
 # Random seed for stochasticity reproducibility
@@ -173,7 +150,7 @@ def get_cross_power(fsignal1, fsignal2, Nbin, kmax, dk, kmode, power, nmode):
     return kmode, power, nmode
   
 # **********************************************
-@njit(parallel=True, cache=True)
+@njit(parallel=False, cache=True)
 def get_cic(posx, posy, posz, lbox, ngrid):
 
     delta = np.zeros((ngrid,ngrid,ngrid))
@@ -622,13 +599,13 @@ tau = tau.flatten()
 #if use_negbin == True:
 #delta[np.where(tweb==4)] += norm*np.random.negative_binomial(nn, pp, size=len(delta[np.where(tweb==4)]))
 
-for ii in range(1,5):
-    for jj in range(1,5):
+for ii in range(1,5): # Loop over T-web environments
+    for jj in range(1,5): # Loop over delta-web environments
         aa = bias_pars[ii,jj,0]
         alpha = bias_pars[ii,jj,1]
         rho = bias_pars[ii,jj,2] 
         eps = bias_pars[ii,jj,3] 
-        tau[np.where(np.logical_and(tweb==ii,dweb==jj))] = aa * (1+delta[np.where(np.logical_and(tweb==ii,dweb==jj))])**alpha * np.exp(-delta[np.where(np.logical_and(tweb==ii,dweb==jj))]/rho)
+        tau[np.where(np.logical_and(tweb==ii,dweb==jj))] = aa * (1+delta[np.where(np.logical_and(tweb==ii,dweb==jj))])**alpha * np.exp(-(delta[np.where(np.logical_and(tweb==ii,dweb==jj))]/rho)**eps)
 
 flux_new = np.exp(-tau)
 flux_new = np.reshape(flux_new, (ngrid,ngrid,ngrid))

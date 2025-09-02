@@ -6,16 +6,19 @@ import matplotlib.pyplot as plt
 
 np.random.seed(123456)
 
-redshift = 1.43
-zstring = '1.430'
+redshift = 2.0
+zstring = '2.000'
 
-ngrid = 360
-lbox = 2000.
+ngrid = 256
+lbox = 500.
+
+lambdath = 0.
 
 dm_filename = '...' 
 tweb_filename = '...' 
 twebdelta_filename = '...' 
-gal_filename = '...'
+flux_filename = '...'
+vz_filename = '...'
 
 out_filename = '...' 
 outpars_filename = '...'
@@ -24,17 +27,28 @@ twebenvs = [1,2,3,4]
 twebdeltaenvs = [1,2,3,4]
 
 verbose_parameters = False
-kkth = 0.5
-npars = 2
 
+# Power spectrum multipoles computation
+mumin = 0.
+mumax = 1.
+axis = 2
+weight_l0 = 2.
+weight_l2 = 1.
+kkth_l0 = 1.0
+kkth_l2 = 0.3
+
+aa_bounds = (1e-3, 10)
 alpha_bounds = (0.01, 3.)
-beta_bounds = (0.1, 100.)
-dth_bounds = (-1, 0.5)
-rhoeps_bounds = (0.3, 20.)
+rho_bounds = (0.3, 20.)
 eps_bounds = (0.1, 3.)
+bv_bounds = (0.5, 1.5)
+bb_bounds = (0., 1.5)
+beta_bounds = (0.5, 1.5)
 
-bounds = np.array([alpha_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
-bestfit = np.array([1.64833716, 1.64806699]) # z=3.0
+npars = 7
+
+bounds = np.array([alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
+bestfit = np.array([1., 1., 1., 1., 1., 1., 1. ]) # z=3.0
 
 fit = True
 
@@ -43,6 +57,17 @@ parslist = []
 # ***********************************
 # ***********************************
 # ***********************************
+def fftr2c(arr):
+    arr = np.fft.rfftn(arr, norm='ortho')
+
+    return arr
+
+def fftc2r(arr):
+    arr = np.fft.irfftn(arr, norm='ortho')
+
+    return arr
+
+# ************************************
 @njit(cache=True)
 def k_squared(lbox,ngrid,ii,jj,kk):
     
@@ -94,32 +119,202 @@ def k_squared_nohermite(lbox,ngrid,ii,jj,kk):
 
       return k2
 
-# ***********************************
-# ***********************************
+# ********************************
+@njit(parallel=False, cache=True, fastmath=True)
+def trilininterp(xx, yy, zz, arrin, lbox, ngrid):
 
+    lcell = lbox/ngrid
+
+    indxc = int(xx/lcell)
+    indyc = int(yy/lcell)
+    indzc = int(zz/lcell)
+
+    wxc = xx/lcell - indxc
+    wyc = yy/lcell - indyc
+    wzc = zz/lcell - indzc
+
+    if wxc <=0.5:
+        indxl = indxc - 1
+        if indxl<0:
+            indxl += ngrid
+        wxc += 0.5
+        wxl = 1 - wxc
+    elif wxc >0.5:
+        indxl = indxc + 1
+        if indxl>=ngrid:
+            indxl -= ngrid
+        wxl = wxc - 0.5
+        wxc = 1 - wxl
+
+    if wyc <=0.5:
+        indyl = indyc - 1
+        if indyl<0:
+            indyl += ngrid
+        wyc += 0.5
+        wyl = 1 - wyc
+    elif wyc >0.5:
+        indyl = indyc + 1
+        if indyl>=ngrid:
+            indyl -= ngrid
+        wyl = wyc - 0.5
+        wyc = 1 - wyl
+
+    if wzc <=0.5:
+        indzl = indzc - 1
+        if indzl<0:
+            indzl += ngrid
+        wzc += 0.5
+        wzl = 1 - wzc
+    elif wzc >0.5:
+        indzl = indzc + 1
+        if indzl>=0:
+            indzl -= ngrid
+        wzl = wzc - 0.5
+        wzc = 1 - wzl
+
+    wtot = wxc*wyc*wzc + wxl*wyc*wzc + wxc*wyl*wzc + wxc*wyc*wzl + wxl*wyl*wzc + wxl*wyc*wzl + wxc*wyl*wzl + wxl*wyl*wzl
+
+    out = 0.
+
+    out += arrin[indxc,indyc,indzc] * wxc*wyc*wzc
+    out += arrin[indxl,indyc,indzc] * wxl*wyc*wzc
+    out += arrin[indxc,indyl,indzc] * wxc*wyl*wzc
+    out += arrin[indxc,indyc,indzl] * wxc*wyc*wzl
+    out += arrin[indxl,indyl,indzc] * wxl*wyl*wzc
+    out += arrin[indxc,indyl,indzl] * wxc*wyl*wzl
+    out += arrin[indxl,indyc,indzl] * wxl*wyc*wzl
+    out += arrin[indxl,indyl,indzl] * wxl*wyl*wzl
+
+    return out        
+
+# ********************************
+@njit(parallel=True, fastmath=True, cache=True)
+def real_to_redshift_space(delta, posx, posy, posz, vz, ngrid, lbox, bv, bb, betarsd, gamma):
+
+    lcell = lbox/ ngrid
+
+    # Parallelize the outer loop                                                                                                                                                                            
+    for ii in prange(len(posx)):
+
+        # Initialize positions at the centre of the cell                                                                                                                                                    
+        xtmp = posx[ii]
+        ytmp = posy[ii]
+        ztmp = posz[ii]
+
+        indx = int(xtmp/lcell)
+        indy = int(ytmp/lcell)
+        indz = int(ztmp/lcell)
+
+        ind3d = indz+ngrid*(indy+ngrid*indx)
+
+        sigma = bb*(1. + delta[indx,indy,indz])**betarsd
+
+        vzrand = np.random.normal(0,sigma)
+        vzrand = np.sign(vzrand) * abs(vzrand) ** gamma
+        vztmp = trilininterp(xtmp, ytmp, ztmp, vz, lbox, ngrid)
+        
+        vztmp += vzrand
+
+        ztmp = ztmp + bv * vztmp #/ (ascale * HH)
+
+        if ztmp<0:
+            ztmp += lbox
+        elif ztmp>lbox:
+            ztmp -= lbox
+
+        posz[ii] = ztmp
+
+    return posx, posy, posz
+
+# ***********************************
+# ***********************************
 @njit(parallel=False, cache=True)
-def get_power(fsignal, Nbin, kmax, dk, kmode, power, nmode):
-    
-    for i in prange(ngrid):
-        for j in prange(ngrid):
-            for k in prange(ngrid):
-                ktot = np.sqrt(k_squared_nohermite(lbox,ngrid,i,j,k))
-                if ktot <= kmax:
-                    nbin = int(ktot/dk-0.5)
-                    akl = fsignal.real[i,j,k]
-                    bkl = fsignal.imag[i,j,k]
-                    kmode[nbin]+=ktot
-                    power[nbin]+=(akl*akl+bkl*bkl)
-                    nmode[nbin]+=1
+def get_power(fsignal, Nbin, kmax, dk, mumin, mumax, axis):
 
-    for m in prange(Nbin):
+    nmode = np.zeros(Nbin)
+    kmode = np.zeros(Nbin)
+    mono = np.zeros(Nbin)
+    quadru = np.zeros(Nbin)
+    hexa = np.zeros(Nbin)
+    
+    for ii in prange(ngrid):
+        for jj in range(ngrid):
+            for kk in range(ngrid):
+                ktot = np.sqrt(k_squared_nohermite(lbox,ngrid,ii,jj,kk))
+
+                if ktot <= kmax:
+
+                    k_par, k_per = get_k_par_per(lbox,ngrid,ii,jj,kk,axis)
+
+                    #print('Done kpar kper')
+
+                    # find the value of mu
+                    if ii==0 and jj==0 and kk==0:  
+                        mu = 0.0
+                    else:    
+                        mu = k_par/ktot
+                    mu2 = mu*mu
+                    #print(mu2)
+                    #print('Done mu2')
+
+                    # take the absolute value of k_par
+                    if k_par<0.:
+                        k_par = -k_par
+                    
+                    if mu>=mumin and mu<mumax:
+                        nbin = int(ktot/dk-0.5)
+                        akl = fsignal.real[ii,jj,kk]
+                        bkl = fsignal.imag[ii,jj,kk]
+                        kmode[nbin]+=ktot
+                        delta2 = akl*akl+bkl*bkl
+                        mono[nbin] += delta2
+                        quadru[nbin] += delta2*(3.0*mu2-1.0)/2.0
+                        hexa[nbin]   += delta2*(35.0*mu2*mu2 - 30.0*mu2 + 3.0)/8.0
+                        nmode[nbin]+=1.
+
+    for m in range(Nbin):
         if(nmode[m]>0):
             kmode[m]/=nmode[m]
-            power[m]/=nmode[m]
+            mono[m]/=nmode[m]
+            quadru[m]/=nmode[m]*5.  # we need to multiply the multipoles by (2*ell + 1)
+            hexa[m]/=nmode[m]*9.    # we need to multiply the multipoles by (2*ell + 1)
 
-    power = power / (ngrid/2)**3
+    mono = mono / (ngrid/2)**3
+    quadru = quadru / (ngrid/2)**3
+    hexa = hexa / (ngrid/2)**3
 
-    return kmode, power, nmode
+    return kmode, mono, quadru, hexa, nmode
+
+# **********************************************
+@njit(cache=True)
+def get_k_par_per(lbox,ngrid,ii,jj,kk,axis):
+
+    kfac = 2.0*np.pi/lbox
+
+    if ii <= ngrid/2:
+        kx = kfac*ii
+    else:
+        kx = -kfac*(ngrid-ii)
+
+    if jj <= ngrid/2:
+        ky = kfac*jj
+    else:
+        ky = -kfac*(ngrid-jj)
+
+    if kk <= ngrid/2:
+          kz = kfac*kk
+    else:
+          kz = -kfac*(ngrid-kk)
+
+    # compute the value of k_par and k_perp
+    if axis==0:   
+        k_par, k_per = kx, np.sqrt(ky*ky + kz*kz)
+    elif axis==1: 
+        k_par, k_per = ky, np.sqrt(kx*kx + kz*kz)
+    else:         
+        k_par, k_per = kz, np.sqrt(kx*kx + ky*ky)
+                                                                                                               
+    return k_par, k_per
 
 # ***********************************
 # ***********************************
@@ -140,11 +335,37 @@ def measure_spectrum(signal):
     
     return kmode[1:], power[1:]
 
+# **********************************************
+@njit(parallel=True, cache=True)
+def divide_by_k2(delta,ngrid, lbox):
+    for ii in prange(ngrid):
+        for jj in prange(ngrid):
+            for kk in prange(round(ngrid/2.)): 
+                k2 = k_squared(lbox,ngrid,ii,jj,kk) 
+                if k2>0.:
+                    delta[ii,jj,kk] /= -k_squared(lbox,ngrid,ii,jj,kk) 
+
+    return delta
+
+# ***********************************
+# ***********************************
+#@njit(parallel=True, cache=True)
+def poisson_solver(delta, ngrid, lbox):
+
+    delta = fftr2c(delta)
+
+    delta = divide_by_k2(delta, ngrid, lbox)
+    
+    delta[0,0,0] = 0.
+
+    delta = fftc2r(delta)
+
+    return delta
+
 # ***********************************
 # ***********************************
-
 @njit(parallel=True, cache=True, fastmath=True)
-def biasmodel_local(ngrid, lbox, delta, tweb, twebdelta, nmean, alpha, beta, dth, rhoeps, eps, rhoepsprime, epsprime, twebenv, twebdeltaenv):
+def biasmodel_withnorm(ngrid, lbox, delta, tweb, twebdelta, nmean, alpha, beta, dth, rhoeps, eps, rhoepsprime, epsprime, twebenv, twebdeltaenv):
      
     lcell = lbox/ ngrid
 
@@ -190,6 +411,30 @@ def biasmodel_local(ngrid, lbox, delta, tweb, twebdelta, nmean, alpha, beta, dth
 
     return ncounts, normal
 
+# ************************************************
+
+@njit(parallel=True, cache=True, fastmath=True)
+def biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv):
+
+    # Allocate tracer field (may be replaced with delta if too memory consuming)
+    flux = np.zeros((ngrid,ngrid,ngrid))
+
+    # FIRST LOOP: deterministic bias
+    # Parallelize the outer loop
+    for ii in prange(ngrid):
+        for jj in range(ngrid):
+            for kk in range(ngrid):
+
+                if tweb[ii,jj,kk]==twebenv and twebdelta[ii,jj,kk]==twebdeltaenv:
+                    
+                    tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-(delta[ii,jj,kk]/rho)**eps)
+                    flux[ii,jj,kk] = np.exp(-tau)
+
+                else:
+                    flux[ii,jj,kk] = 1.
+
+    return flux
+
 # ********************************
 # ********************************
 @njit(fastmath=True, cache=True)
@@ -206,44 +451,126 @@ def negative_binomial(n, p):
 
 # ********************************
 # ********************************
+@njit(parallel=True, cache=True)
+def get_cic(posx, posy, posz, lbox, ngrid):
+
+    delta = np.zeros((ngrid,ngrid,ngrid))
+
+    lcell = lbox / ngrid
+
+    for ii in prange(ngrid**3):
+        xx = posx[ii]
+        yy = posy[ii]
+        zz = posz[ii]
+        indxc = int(xx/lcell)
+        indyc = int(yy/lcell)
+        indzc = int(zz/lcell)
+
+        wxc = xx/lcell - indxc
+        wyc = yy/lcell - indyc
+        wzc = zz/lcell - indzc
+
+        if wxc <=0.5:
+            indxl = indxc - 1
+            if indxl<0:
+                indxl += ngrid
+            wxc += 0.5
+            wxl = 1 - wxc
+        elif wxc >0.5:
+            indxl = indxc + 1
+            if indxl>=ngrid:
+                indxl -= ngrid
+            wxl = wxc - 0.5
+            wxc = 1 - wxl
+
+        if wyc <=0.5:
+            indyl = indyc - 1
+            if indyl<0:
+                indyl += ngrid
+            wyc += 0.5
+            wyl = 1 - wyc
+        elif wyc >0.5:
+            indyl = indyc + 1
+            if indyl>=ngrid:
+                indyl -= ngrid
+            wyl = wyc - 0.5
+            wyc = 1 - wyl
+            
+
+        if wzc <=0.5:
+            indzl = indzc - 1
+            if indzl<0:
+                indzl += ngrid
+            wzc += 0.5
+            wzl = 1 - wzc
+        elif wzc >0.5:
+            indzl = indzc + 1
+            if indzl>=ngrid:
+                indzl -= ngrid
+            wzl = wzc - 0.5
+            wzc = 1 - wzl
+
+        delta[indxc,indyc,indzc] += wxc*wyc*wzc
+        delta[indxl,indyc,indzc] += wxl*wyc*wzc
+        delta[indxc,indyl,indzc] += wxc*wyl*wzc
+        delta[indxc,indyc,indzl] += wxc*wyc*wzl
+        delta[indxl,indyl,indzc] += wxl*wyl*wzc
+        delta[indxc,indyl,indzl] += wxc*wyl*wzl
+        delta[indxl,indyc,indzl] += wxl*wyc*wzl
+        delta[indxl,indyl,indzl] += wxl*wyl*wzl
+
+    #delta = delta/np.mean(delta) - 1.
+
+    return delta
+
+# ********************************
+# ********************************
 def chisquare(xx):
 
     # Define the parameters to fit
-    alpha = xx[0]
-    beta = xx[1]
-    dth = -1#xx[2]
-    rhoeps = 1e6#xx[3]
-    eps = 1.#xx[4]
-    rhoepsprime = 1.
-    epsprime = 1.
-    
-    ncounts_new, normalization = biasmodel_local(ngrid, lbox, delta, tweb, twebdelta, meandens, alpha, beta, dth, rhoeps, eps, rhoepsprime, epsprime, twebenv, twebdeltaenv)
-    if plot_pk == True:
-          print('Maximum number of galaxies in cells: ', np.amax(ncounts_new))
-          print('Total number of galaxies: ', np.sum(ncounts_new))
+    aa = xx[0]
+    alpha = xx[1]
+    rho = xx[2]
+    eps = xx[3]
+    bv = xx[4]
+    bb = xx[5]
+    betarsd = xx[6]
+    gamma = 1.
 
-    #ncounts_new = ncounts_new / np.mean(ncounts_new) - 1
-    #print(len(pk_l0[np.where(kk<kkth_l0)),pk_l0[np.where(kk<kkth_l0))
-    
-    ncounts_new_mask = np.zeros((ngrid,ngrid,ngrid))
-    ncounts_new_mask[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)] = ncounts_new[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)]
+    posxnew, posynew, posznew = real_to_redshift_space(delta, vz, ngrid, lbox, bv, bb, betarsd, gamma)
 
-    kk, pk = measure_spectrum(ncounts_new_mask)
+    # Periodic BCs
+    posxnew[posxnew<0.] += lbox
+    posxnew[posxnew>=lbox] -= lbox
+    posynew[posynew<0.] += lbox
+    posynew[posynew>=lbox] -= lbox
+    posznew[posznew<0.] += lbox
+    posznew[posznew>=lbox] -= lbox
 
-    chisq = np.sum((pk[np.where(kk<kkth)]/pkgal[np.where(kk<kkth)] - 1.)**2)/len(pk[np.where(kk<kkth)])
+    delta_new = get_cic(posxnew, posynew, posznew, lbox, ngrid)
+    delta_new = delta_new/np.mean(delta_new) - 1.
 
-    #chisq = weight_l0*chisq_l0 + weight_l2*chisq_l2
+    flux_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
+    flux_new_mask = np.ones((ngrid,ngrid,ngrid))
+    flux_new_mask[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)] = flux_new[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)]
+
+    kk, pk_l0, pk_l2, pk_l4 = measure_spectrum(flux_new_mask)
+
+    chisq_l0 = np.sum((pk_l0[np.where(kk<kkth_l0)]/pkref_l0[np.where(kk<kkth_l0)] - 1.)**2)/len(pk_l0[np.where(kk<kkth_l0)])
+    chisq_l2 = np.sum((pk_l2[np.where(kk<kkth_l2)]/pkref_l2[np.where(kk<kkth_l2)] - 1.)**2)/len(pk_l2[np.where(kk<kkth_l2)])
+
+    chisq = weight_l0*chisq_l0 + weight_l2*chisq_l2
 
     if verbose_parameters == True:
         print('PARS: ', xx)
-        print('Monopole ratios (%): ', (pk[np.where(kk<kkth)]/pkgal[np.where(kk<kkth)] - 1.)*100.)
+        print('Monopole ratios (%): ', (pk_l0[np.where(kk<kkth_l0)]/pkref_l0[np.where(kk<kkth_l0)] - 1.)*100.)
         #print('Quadrupole ratios (%): ', (pk_l2[np.where(kk<kkth_l2)]/pkref_l2[np.where(kk<kkth_l2)] - 1.)*100.)
         print('----------------------------------------------')
 
 
     if plot_pk == True:
-        plt.plot(kk, pkgal/pkgal, color='red', label='Ref')
-        plt.plot(kk, pk/pkgal, color='green', linestyle='dashed', label='Mock')
+        plt.plot(kk, pkref_l0/pkref_l0, color='red', label='Ref')
+        plt.plot(kk, pk_l0/pkref_l0, color='green', linestyle='dashed', label='Mock')
         plt.fill_between(kk, 0.99*np.ones(len(kk)), 1.01*np.ones(len(kk)), color='gray', alpha=0.7)
         plt.fill_between(kk, 0.98*np.ones(len(kk)), 1.02*np.ones(len(kk)), color='gray', alpha=0.5)
         plt.fill_between(kk, 0.95*np.ones(len(kk)), 1.05*np.ones(len(kk)), color='gray', alpha=0.3)
@@ -254,11 +581,191 @@ def chisquare(xx):
         #plt.yscale('log')
         #plt.ylim([0.85, 1.15])
         plt.legend()
-        plt.savefig('pk_ratios_ngp_rspace_z%s.pdf' %zstring, bbox_inches='tight')
+        plt.savefig('pk_ratios_flux_zspace_z%s_tweb%d_dweb%d.pdf' %(zstring, twebenv, twebdeltaenv), bbox_inches='tight')
         plt.show()
 
     return chisq
 
+# ********************************
+# ********************************
+@njit(parallel=True, cache=True)
+def gradfindiff(lbox,ngrid,arr,dim):
+
+    fac = ngrid/(2*lbox)
+
+    outarr = arr.copy()
+
+    for xx in prange(ngrid):
+        for yy in prange(ngrid):
+            for zz in prange(ngrid):
+
+                xdummy = np.array([xx,xx,xx,xx])
+                ydummy = np.array([yy,yy,yy,yy])
+                zdummy = np.array([zz,zz,zz,zz])
+                xxr = xdummy[0]
+                xxrr = xdummy[1]
+                xxl = xdummy[2]
+                xxll = xdummy[3]
+                yyr = ydummy[0]
+                yyrr = ydummy[1]
+                yyl = ydummy[2]
+                yyll = ydummy[3]
+                zzr = zdummy[0]
+                zzrr = zdummy[1]
+                zzl = zdummy[2]
+                zzll = zdummy[3]
+
+                # Periodic BCs
+                if dim == 1:
+                    xxl = xx - 1
+                    xxll = xx - 2
+                    xxr = xx + 1
+                    xxrr = xx + 2
+                    
+                    if xxl<0:
+                        xxl += ngrid
+                    if xxl>=ngrid:
+                        xxl -= ngrid
+                    
+                    if xxll<0:
+                        xxll += ngrid
+                    if xxll>=ngrid:
+                        xxll -= ngrid
+                    
+                    if xxr<0:
+                        xxr += ngrid
+                    if xxr>=ngrid:
+                        xxr -= ngrid
+
+                    if xxrr<0:
+                        xxrr += ngrid
+                    if xxrr>=ngrid:
+                        xxrr -= ngrid
+
+
+                elif dim == 2:
+                    
+                    yyl = yy - 1
+                    yyll = yy - 2
+                    yyr = yy + 1
+                    yyrr = yy + 2
+                    
+                    if yyl<0:
+                        yyl += ngrid
+                    if yyl>=ngrid:
+                        yyl -= ngrid
+                    
+                    if yyll<0:
+                        yyll += ngrid
+                    if yyll>=ngrid:
+                        yyll -= ngrid
+                    
+                    if yyr<0:
+                        yyr += ngrid
+                    if yyr>=ngrid:
+                        yyr -= ngrid
+
+                    if yyrr<0:
+                        yyrr += ngrid
+                    if yyrr>=ngrid:
+                        yyrr -= ngrid
+
+
+                elif dim == 3:
+                    
+                    zzl = zz - 1
+                    zzll = zz - 2
+                    zzr = zz + 1
+                    zzrr = zz + 2
+                    
+                    if zzl<0:
+                        zzl += ngrid
+                    if zzl>=ngrid:
+                        zzl -= ngrid
+                    
+                    if zzll<0:
+                        zzll += ngrid
+                    if zzll>=ngrid:
+                        zzll -= ngrid
+                    
+                    if zzr<0:
+                        zzr += ngrid
+                    if zzr>=ngrid:
+                        zzr -= ngrid
+
+                    if zzrr<0:
+                        zzrr += ngrid
+                    if zzrr>=ngrid:
+                        zzrr -= ngrid
+
+                outarr[xx,yy,zz] = -fac*((4.0/3.0)*(arr[xxl,yyl,zzl]-arr[xxr,yyr,zzr])-(1.0/6.0)*(arr[xxll,yyll,zzll]-arr[xxrr,yyrr,zzrr]))
+
+    return outarr
+
+# ********************************
+# **********************************************
+@njit(parallel=True, cache=True)
+def get_tidal_invariants(arr, ngrid, lbox):
+
+    # Get gradients exploiting simmetry of the tensor, i.e. gradxy=gradyx
+
+    # X DIRECTION
+    # 1st deriv
+    grad = gradfindiff(lbox,ngrid,arr,1)
+    #2nd derivs
+    gradxx = gradfindiff(lbox,ngrid,grad,1)
+    gradxy = gradfindiff(lbox,ngrid,grad,2)
+    gradxz = gradfindiff(lbox,ngrid,grad,3)
+
+    # Y DIRECTION
+    # 1st deriv
+    grad = gradfindiff(lbox,ngrid,arr,2)
+    #2nd derivs
+    gradyy = gradfindiff(lbox,ngrid,grad,2)
+    gradyz = gradfindiff(lbox,ngrid,grad,3)
+
+    # Y DIRECTION
+    # 1st deriv
+    grad = gradfindiff(lbox,ngrid,arr,3)
+    #2nd derivs
+    gradzz = gradfindiff(lbox,ngrid,grad,3)
+
+    #del arr, grad
+
+    lambda1 = np.zeros_like((gradxx))
+    lambda2 = np.zeros_like((gradxx))
+    lambda3 = np.zeros_like((gradxx))
+    tweb = np.zeros_like((gradxx))
+
+    # Compute eigenvalues    
+    for ii in prange(ngrid):
+        for jj in prange(ngrid):
+            for kk in prange(ngrid):
+                mat = np.array([[gradxx[ii,jj,kk],gradxy[ii,jj,kk],gradxz[ii,jj,kk]],[gradxy[ii,jj,kk],gradyy[ii,jj,kk],gradyz[ii,jj,kk]],[gradxz[ii,jj,kk],gradyz[ii,jj,kk],gradzz[ii,jj,kk]]])
+                eigs = np.linalg.eigvals(mat)
+                eigs = np.flip(np.sort(eigs))
+                lambda1[ii,jj,kk] = eigs[0]
+                lambda2[ii,jj,kk] = eigs[1]
+                lambda3[ii,jj,kk] = eigs[2]
+                if eigs[0]>=lambdath and eigs[1]>=lambdath and eigs[2]>=lambdath:
+                    tweb[ii,jj,kk] = 1
+                elif eigs[0]>=lambdath and eigs[1]>=lambdath and eigs[2]<lambdath:
+                    tweb[ii,jj,kk] = 2
+                elif eigs[0]>=lambdath and eigs[1]<lambdath and eigs[2]<lambdath:
+                    tweb[ii,jj,kk] = 3
+                elif eigs[0]<lambdath and eigs[1]<lambdath and eigs[2]<lambdath:
+                    tweb[ii,jj,kk] = 4
+
+    # Now compute invariants
+    #del gradxx, gradxy, gradxz, gradyy,gradyz,gradzz
+    
+    #I1 = lambda1 + lambda2 + lambda3
+    #I2 = lambda1 * lambda2 + lambda1 * lambda3 + lambda2 * lambda3
+    #I3 = lambda2 * lambda2 * lambda3
+
+    #del lambda1, lambda2, lambda3
+
+    return tweb
 
 # ********************************
 # ********************************
@@ -272,31 +779,45 @@ else:
 delta = np.fromfile(dm_filename, dtype=np.float32)
 delta = np.reshape(delta, (ngrid,ngrid,ngrid))
 
-tweb = np.fromfile(tweb_filename, dtype=np.float32)
-tweb = np.reshape(tweb, (ngrid,ngrid,ngrid))
+vz = np.fromfile(vz_filename, dtype=np.float32)
+vz = np.reshape(vz, (ngrid,ngrid,ngrid))
 
-twebdelta = np.fromfile(twebdelta_filename, dtype=np.float32)
-twebdelta = np.reshape(twebdelta, (ngrid,ngrid,ngrid))
+fluxref = np.fromfile(flux_filename, dtype=np.float32)
+fluxref = np.reshape(fluxref, (ngrid,ngrid,ngrid))
 
-print(np.amin(delta), np.amax(delta))
+# Do T-web and Tweb-delta computaiton just once
+# Solve Poisson equation in real space
+print('Solving Poisson equation ...')
+phi = poisson_solver(delta,ngrid, lbox) 
 
-ncounts = np.fromfile(gal_filename, dtype=np.float32)
-ncounts = np.reshape(ncounts, (ngrid,ngrid,ngrid))
+# Compute T-web in real space
+print('Computing invariants of tidal field ...')
+tweb = get_tidal_invariants(delta, ngrid, lbox)
+
+# Map density field from real to redshift space
+delta = real_to_redshift_space(delta, vz, ngrid, lbox, -0.9, 2.0, 0.5, 1.0) # Now delta is in redshift space
+
+# Solve Poisson equation in redshift space
+print('Solving Poisson equation ...')
+phi = poisson_solver(delta,ngrid, lbox) 
+
+# Compute T-web in redshift space
+print('Computing invariants of tidal field ...')
+tweb = get_tidal_invariants(phi, ngrid, lbox) # Now also the T-web is in redshift space
+twebdelta = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in redshift space
 
 for twebenv in twebenvs:
     for twebdeltaenv in twebdeltaenvs:          
         
-        meandens = np.sum(ncounts[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)])/lbox**3
+        meandens = np.sum(fluxref[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)])/lbox**3
 
         print('=========================')
         print('Fitting %d %d ...' %(twebenv, twebdeltaenv))
-        #print(np.amin(ncounts), np.amax(ncounts))
-        #ncounts = ncounts / np.mean(ncounts) - 1
         
-        ncounts_mask = np.zeros((ngrid,ngrid,ngrid))
-        ncounts_mask[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)] = ncounts[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)]
+        fluxref_mask = np.zeros((ngrid,ngrid,ngrid))
+        fluxref_mask[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)] = fluxref[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)]
         
-        kkgal, pkgal = measure_spectrum(ncounts_mask)
+        kkref, pkref_l0, pkref_l2, pkref_l4 = measure_spectrum(fluxref_mask)
         
         # Fit
         print('Fitting ...')
@@ -316,19 +837,23 @@ for twebenv in twebenvs:
             
         x0new = solution['variable']
 
-        alpha = x0new[0]
-        beta = x0new[1]
-        dth = -1#x0new[2]
-        rhoeps = 1e6 #x0new[3]
-        eps = 1.#x0new[4]
-        rhoepsprime = 1e6 #x0new[3]
-        epsprime = 1.#x0new[4]
+        aa = x0new[0]
+        alpha = x0new[1]
+        rho = x0new[2]
+        eps = x0new[3]
+        bv = x0new[4]
+        bb = x0new[5]
+        betarsd = x0new[6]
 
-        ncounts_new, normalization = biasmodel_local(ngrid, lbox, delta, tweb, twebdelta, meandens, alpha, beta, dth, rhoeps, eps, rhoepsprime, epsprime, twebenv, twebdeltaenv)
+        ncounts_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
 
-        parslist.append(normalization)
+        parslist.append(aa)
         parslist.append(alpha)
-        parslist.append(beta)
+        parslist.append(rho)
+        parslist.append(eps)
+        parslist.append(bv)
+        parslist.append(bv)
+        parslist.append(betarsd)
 
       
 np.save(outpars_filename, parslist)
