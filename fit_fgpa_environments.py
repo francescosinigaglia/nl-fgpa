@@ -21,8 +21,8 @@ vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 #out_filename = '...' 
 outpars_filename = 'bestfit_pars.npy'
 
-twebenvs = [1] # CW environments for the gravitational tidal field tensor (T-web)
-twebdeltaenvs = [1] # CW environments for the curvature tensor (delta-web)
+twebenvs = [1,2,3,4] # CW environments for the gravitational tidal field tensor (T-web)
+twebdeltaenvs = [12,3,4] # CW environments for the curvature tensor (delta-web)
 
 verbose_parameters = False
 
@@ -46,9 +46,9 @@ beta_bounds = (0.5, 1.5)
 npars = 7
 
 bounds = np.array([aa_bounds, alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
-bestfit = np.array([0.53207911,  0.19834801,  0.77863928,  1.01920013, -1.07637647,  1.45792315,  0.80904]) # z=3.0
+bestfit = np.array([ 0.83483194,  1.03216506,  1.64145321, -2.86247334, -1.15286649,  1.87171906,  0.90479355]) # z=3.0
 
-fit = True
+fit = False
 
 prec = np.float64
 
