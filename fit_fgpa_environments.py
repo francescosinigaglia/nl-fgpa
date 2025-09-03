@@ -597,9 +597,8 @@ def chisquare(xx):
 
     if plot_pk == True:
         plt.plot(kk, pkref_l0/pkref_l0, color='red', label='Ref')
-        plt.plot(kk, pk_l0/pkref_l0, color='C0', linestyle='dashed', label='Mock l=0')
-        #plt.plot(kk, pkref_l0/pkref_l0, color='red', label='Ref l=0')
-        plt.plot(kk, pk_l2/pkref_l2, color='green', linestyle='dashed', label='Mock l=2')
+        plt.plot(kk, pk_l0/pkref_l0, color='blue', linestyle='dashed', label='Mock l=0')
+        plt.plot(kk, pk_l2/pkref_l2, color='green', linestyle='dashdot', label='Mock l=2')
         plt.fill_between(kk, 0.99*np.ones(len(kk)), 1.01*np.ones(len(kk)), color='gray', alpha=0.7)
         plt.fill_between(kk, 0.98*np.ones(len(kk)), 1.02*np.ones(len(kk)), color='gray', alpha=0.5)
         plt.fill_between(kk, 0.95*np.ones(len(kk)), 1.05*np.ones(len(kk)), color='gray', alpha=0.3)

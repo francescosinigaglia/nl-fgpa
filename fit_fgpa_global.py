@@ -453,7 +453,7 @@ def biasmodel(ngrid, lbox, delta, tweb, twebdelta, biaspars):
                 rho = biaspars[tind,dind,2]
                 eps = biaspars[tind,dind,3]
    
-                tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-(delta[ii,jj,kk]/rho)**eps)
+                tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-((1.+delta[ii,jj,kk])/rho)**eps)
                 flux[ii,jj,kk] = np.exp(-tau)
 
     return flux
@@ -604,7 +604,8 @@ def chisquare(yy):
 
     if plot_pk == True:
         plt.plot(kk, pkref_l0/pkref_l0, color='red', label='Ref')
-        plt.plot(kk, pk_l0/pkref_l0, color='green', linestyle='dashed', label='Mock')
+        plt.plot(kk, pk_l0/pkref_l0, color='blue', linestyle='dashed', label='Mock l=0')
+        plt.plot(kk, pk_l0/pkref_l0, color='green', linestyle='dashdot', label='Mock l=2')
         plt.fill_between(kk, 0.99*np.ones(len(kk)), 1.01*np.ones(len(kk)), color='gray', alpha=0.7)
         plt.fill_between(kk, 0.98*np.ones(len(kk)), 1.02*np.ones(len(kk)), color='gray', alpha=0.5)
         plt.fill_between(kk, 0.95*np.ones(len(kk)), 1.05*np.ones(len(kk)), color='gray', alpha=0.3)
@@ -613,9 +614,9 @@ def chisquare(yy):
         plt.ylabel('P(k) ratios')
         plt.xscale('log')
         #plt.yscale('log')
-        #plt.ylim([0.85, 1.15])
+        plt.ylim([0.5, 1.5])
         plt.legend()
-        plt.savefig('pk_ratios_flux_zspace_z%s_tweb%d_dweb%d.pdf' %(zstring, twebenv, twebdeltaenv), bbox_inches='tight')
+        plt.savefig('pk_ratios_flux_zspace_z%s.pdf' %(zstring), bbox_inches='tight')
         plt.show()
 
     return chisq
@@ -868,14 +869,14 @@ twebdelta = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in 
         
         
 meandens = np.sum(fluxref)/lbox**3
-
-print('=========================')
-print('Fitting ...')
         
 kkref, pkref_l0, pkref_l2, pkref_l4 = measure_spectrum(fluxref)
-        
-# Fit
-algorithm_param = {'max_num_iteration': 100,
+
+if fit == True:
+    print('=========================')
+    print('Fitting ...')
+    # Fit
+    algorithm_param = {'max_num_iteration': 100,
                    'population_size':100,
                    'mutation_probability':0.1,
                    'elit_ratio': 0.01,
@@ -884,15 +885,21 @@ algorithm_param = {'max_num_iteration': 100,
                    'crossover_type':'uniform',
                    'max_iteration_without_improv':10}
             
-model=ga(function=chisquare,dimension=npars,variable_type='real',variable_boundaries=bounds, algorithm_parameters=algorithm_param)
-model.run()
-convergence=model.report
-solution=model.output_dict
+    model=ga(function=chisquare,dimension=npars,variable_type='real',variable_boundaries=bounds, algorithm_parameters=algorithm_param)
+    model.run()
+    convergence=model.report
+    solution=model.output_dict
             
-x0new = solution['variable']
+    x0new = solution['variable']
 
-ncounts_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, x0new)
+    #ncounts_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, x0new)
+    parslist = x0new.flatten()
 
-parslist = x0new.flatten()
+    np.save(outpars_filename, parslist)
 
-np.save(outpars_filename, parslist)
+else:
+
+    x0new = np.load(outpars_filename)
+    x0new = np.reshape(x0new,(4,4,int(len(x0new)/16)))
+
+    chisquare(x0new)
