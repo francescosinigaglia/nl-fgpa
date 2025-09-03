@@ -586,7 +586,7 @@ def chisquare(yy):
     delta_new = get_cic(posxnew, posynew, posznew, lbox, ngrid)
     delta_new = delta_new/np.mean(delta_new) - 1.
 
-    flux_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, xx)
+    flux_new = biasmodel(ngrid, lbox, delta_new, tweb, twebdelta, xx)
 
     kk, pk_l0, pk_l2, pk_l4 = measure_spectrum(flux_new)
 

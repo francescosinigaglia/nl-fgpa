@@ -24,7 +24,7 @@ outpars_filename = 'bestfit_pars.npy'
 twebenvs = [1,2,3,4] # CW environments for the gravitational tidal field tensor (T-web)
 twebdeltaenvs = [1,2,3,4] # CW environments for the curvature tensor (delta-web)
 
-verbose_parameters = False
+verbose_parameters = True
 
 # Power spectrum multipoles computation
 mumin = 0.
@@ -573,7 +573,7 @@ def chisquare(xx):
     delta_new = get_cic(posxnew, posynew, posznew, lbox, ngrid)
     delta_new = delta_new/np.mean(delta_new) - 1.
 
-    flux_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
+    flux_new = biasmodel(ngrid, lbox, delta_new, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
     flux_new_mask = np.ones((ngrid,ngrid,ngrid))
     flux_new_mask[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)] = flux_new[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)]
 
@@ -825,18 +825,17 @@ posx, posy, posz = real_to_redshift_space(delta, vz, ngrid, lbox, -0.9, 2.0, 0.5
 posz[posz<0.] += lbox
 posz[posz>=lbox] -= lbox
 
-delta = get_cic(posx, posy, posz, lbox, ngrid)
-delta = delta/np.mean(delta) - 1.
-print(delta.shape)
+deltad = get_cic(posx, posy, posz, lbox, ngrid)
+deltad = deltad/np.mean(deltad) - 1.
 
 # Solve Poisson equation in redshift space
 print('Solving Poisson equation ...')
-phi = poisson_solver(delta,ngrid, lbox) 
+phid = poisson_solver(deltad,ngrid, lbox) 
 
 # Compute T-web in redshift space
 print('Computing invariants of tidal field ...')
-tweb = get_tidal_invariants(phi, ngrid, lbox) # Now also the T-web is in redshift space
-twebdelta = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in redshift space
+tweb = get_tidal_invariants(phid, ngrid, lbox) # Now also the T-web is in redshift space
+twebdelta = get_tidal_invariants(deltad, ngrid, lbox) # Now also the T-web is in redshift space
 
 for twebenv in twebenvs:
     for twebdeltaenv in twebdeltaenvs:          
