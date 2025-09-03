@@ -21,10 +21,10 @@ vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 #out_filename = '...' 
 outpars_filename = 'bestfit_pars.npy'
 
-twebenvs = [1,2,3,4] # CW environments for the gravitational tidal field tensor (T-web)
-twebdeltaenvs = [1,2,3,4] # CW environments for the curvature tensor (delta-web)
+twebenvs = [1] # CW environments for the gravitational tidal field tensor (T-web)
+twebdeltaenvs = [1] # CW environments for the curvature tensor (delta-web)
 
-verbose_parameters = True
+verbose_parameters = False
 
 # Power spectrum multipoles computation
 mumin = 0.
@@ -35,20 +35,20 @@ weight_l2 = 1.
 kkth_l0 = 1.0
 kkth_l2 = 0.3
 
-aa_bounds = (1e-3, 10)
+aa_bounds = (0.1, 1.)
 alpha_bounds = (0.01, 3.)
-rho_bounds = (-1., 20.)
-eps_bounds = (-3., 3.)
-bv_bounds = (0.5, 1.5)
-bb_bounds = (0., 1.5)
+rho_bounds = (0.5, 2.)
+eps_bounds = (0.9, 1.1)
+bv_bounds = (-1.2, -0.8)
+bb_bounds = (0.5, 1.5)
 beta_bounds = (0.5, 1.5)
 
 npars = 7
 
 bounds = np.array([aa_bounds, alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
-bestfit = np.array([1., 1., 1., 1., 1., 1., 1. ]) # z=3.0
+bestfit = np.array([0.93175081, 2.91613656,  1.97147981,  1.02130598, -0.843998,    0.86002463, 1.13502397 ]) # z=3.0
 
-fit = True
+fit = False
 
 prec = np.float64
 
@@ -195,6 +195,10 @@ def real_to_redshift_space(delta, vz, ngrid, lbox, bv, bb, betarsd, gamma):
     posx = np.zeros(ngrid**3)
     posy = np.zeros(ngrid**3)
     posz = np.zeros(ngrid**3)
+
+    #bv = -1
+    #bb = 1.
+    #betarsd = 0.5
 
     # Parallelize the outer loop                                                                                                                                                                            
     for ii in prange(ngrid):
@@ -450,7 +454,7 @@ def biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv,
 
                 if tweb[ii,jj,kk]==twebenv and twebdelta[ii,jj,kk]==twebdeltaenv:
                     
-                    tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-(delta[ii,jj,kk]/rho)**eps)
+                    tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-(delta[ii,jj,kk]/rho))#**eps)
                     flux[ii,jj,kk] = np.exp(-tau)
 
                 else:
@@ -593,7 +597,9 @@ def chisquare(xx):
 
     if plot_pk == True:
         plt.plot(kk, pkref_l0/pkref_l0, color='red', label='Ref')
-        plt.plot(kk, pk_l0/pkref_l0, color='green', linestyle='dashed', label='Mock')
+        plt.plot(kk, pk_l0/pkref_l0, color='C0', linestyle='dashed', label='Mock l=0')
+        #plt.plot(kk, pkref_l0/pkref_l0, color='red', label='Ref l=0')
+        plt.plot(kk, pk_l2/pkref_l2, color='green', linestyle='dashed', label='Mock l=2')
         plt.fill_between(kk, 0.99*np.ones(len(kk)), 1.01*np.ones(len(kk)), color='gray', alpha=0.7)
         plt.fill_between(kk, 0.98*np.ones(len(kk)), 1.02*np.ones(len(kk)), color='gray', alpha=0.5)
         plt.fill_between(kk, 0.95*np.ones(len(kk)), 1.05*np.ones(len(kk)), color='gray', alpha=0.3)
@@ -602,7 +608,7 @@ def chisquare(xx):
         plt.ylabel('P(k) ratios')
         plt.xscale('log')
         #plt.yscale('log')
-        #plt.ylim([0.85, 1.15])
+        plt.ylim([0.5, 1.5])
         plt.legend()
         plt.savefig('pk_ratios_flux_zspace_z%s_tweb%d_dweb%d.pdf' %(zstring, twebenv, twebdeltaenv), bbox_inches='tight')
         plt.show()
@@ -850,9 +856,10 @@ for twebenv in twebenvs:
         
         kkref, pkref_l0, pkref_l2, pkref_l4 = measure_spectrum(fluxref_mask)
         
-        # Fit
-        print('Fitting ...')
-        algorithm_param = {'max_num_iteration': 100,
+        if fit == True:
+            # Fit
+            print('Fitting ...')
+            algorithm_param = {'max_num_iteration': 100,
                    'population_size':100,
                    'mutation_probability':0.1,
                    'elit_ratio': 0.01,
@@ -861,30 +868,36 @@ for twebenv in twebenvs:
                    'crossover_type':'uniform',
                    'max_iteration_without_improv':10}
             
-        model=ga(function=chisquare,dimension=npars,variable_type='real',variable_boundaries=bounds, algorithm_parameters=algorithm_param)
-        model.run()
-        convergence=model.report
-        solution=model.output_dict
+            model=ga(function=chisquare,dimension=npars,variable_type='real',variable_boundaries=bounds, algorithm_parameters=algorithm_param)
+            model.run()
+            convergence=model.report
+            solution=model.output_dict
             
-        x0new = solution['variable']
+            x0new = solution['variable']
 
-        aa = x0new[0]
-        alpha = x0new[1]
-        rho = x0new[2]
-        eps = x0new[3]
-        bv = x0new[4]
-        bb = x0new[5]
-        betarsd = x0new[6]
+            aa = x0new[0]
+            alpha = x0new[1]
+            rho = x0new[2]
+            eps = x0new[3]
+            bv = x0new[4]
+            bb = x0new[5]
+            betarsd = x0new[6]
 
-        ncounts_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
+            #ncounts_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
 
-        parslist.append(aa)
-        parslist.append(alpha)
-        parslist.append(rho)
-        parslist.append(eps)
-        parslist.append(bv)
-        parslist.append(bv)
-        parslist.append(betarsd)
+            parslist.append(aa)
+            parslist.append(alpha)
+            parslist.append(rho)
+            parslist.append(eps)
+            parslist.append(bv)
+            parslist.append(bv)
+            parslist.append(betarsd)
+        
+        else:
 
-      
-np.save(outpars_filename, parslist)
+            x0new =  bestfit # solution['variable']
+
+            chisquare(x0new)
+
+if fit == True:
+    np.save(outpars_filename, parslist)
