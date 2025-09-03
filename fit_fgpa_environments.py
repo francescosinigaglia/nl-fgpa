@@ -48,7 +48,7 @@ npars = 7
 bounds = np.array([aa_bounds, alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
 bestfit = np.array([0.93175081, 2.91613656,  1.97147981,  1.02130598, -0.843998,    0.86002463, 1.13502397 ]) # z=3.0
 
-fit = False
+fit = True
 
 prec = np.float64
 
@@ -851,7 +851,7 @@ for twebenv in twebenvs:
         print('=========================')
         print('Fitting %d %d ...' %(twebenv, twebdeltaenv))
         
-        fluxref_mask = np.zeros((ngrid,ngrid,ngrid))
+        fluxref_mask = np.ones((ngrid,ngrid,ngrid))
         fluxref_mask[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)] = fluxref[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)]
         
         kkref, pkref_l0, pkref_l2, pkref_l4 = measure_spectrum(fluxref_mask)
