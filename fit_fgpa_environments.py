@@ -890,7 +890,7 @@ for twebenv in twebenvs:
             parslist.append(rho)
             parslist.append(eps)
             parslist.append(bv)
-            parslist.append(bv)
+            parslist.append(bb)
             parslist.append(betarsd)
         
         else:
