@@ -37,16 +37,16 @@ kkth_l2 = 0.3
 
 aa_bounds = (0.1, 1.)
 alpha_bounds = (0.01, 3.)
-rho_bounds = (0.5, 2.)
-eps_bounds = (0.9, 1.1)
+rho_bounds = (0.1, 2.)
+eps_bounds = (-3., 3.)
 bv_bounds = (-1.2, -0.8)
-bb_bounds = (0.5, 1.5)
+bb_bounds = (0.5, 2.)
 beta_bounds = (0.5, 1.5)
 
 npars = 7
 
 bounds = np.array([aa_bounds, alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
-bestfit = np.array([0.93175081, 2.91613656,  1.97147981,  1.02130598, -0.843998,    0.86002463, 1.13502397 ]) # z=3.0
+bestfit = np.array([0.53207911,  0.19834801,  0.77863928,  1.01920013, -1.07637647,  1.45792315,  0.80904]) # z=3.0
 
 fit = True
 
@@ -454,7 +454,7 @@ def biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv,
 
                 if tweb[ii,jj,kk]==twebenv and twebdelta[ii,jj,kk]==twebdeltaenv:
                     
-                    tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-(delta[ii,jj,kk]/rho))#**eps)
+                    tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-((1.+delta[ii,jj,kk])/rho)**eps)
                     flux[ii,jj,kk] = np.exp(-tau)
 
                 else:
