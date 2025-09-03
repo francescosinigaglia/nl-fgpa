@@ -19,12 +19,14 @@ flux_filename = 'fluxz.z2_0.sim2.n256.zspace.dat'
 vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 
 #out_filename = '...' 
-outpars_filename = 'bestfit_pars.npy'
-
-twebenvs = [1,2,3,4] # CW environments for the gravitational tidal field tensor (T-web)
-twebdeltaenvs = [1,2,3,4] # CW environments for the curvature tensor (delta-web)
+inpars_filename = 'bestfit_pars.npy'
+outpars_filename = 'bestfit_pars_global.npy'
 
 verbose_parameters = False
+
+npars_fit = 7
+
+bounds_range = 0.2 
 
 # Power spectrum multipoles computation
 mumin = 0.
@@ -34,19 +36,6 @@ weight_l0 = 2.
 weight_l2 = 1.
 kkth_l0 = 1.0
 kkth_l2 = 0.3
-
-aa_bounds = (1e-3, 10)
-alpha_bounds = (0.01, 3.)
-rho_bounds = (-1., 20.)
-eps_bounds = (-3., 3.)
-bv_bounds = (0.5, 1.5)
-bb_bounds = (0., 1.5)
-beta_bounds = (0.5, 1.5)
-
-npars = 7
-
-bounds = np.array([aa_bounds, alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
-bestfit = np.array([1., 1., 1., 1., 1., 1., 1. ]) # z=3.0
 
 fit = True
 
@@ -188,7 +177,7 @@ def trilininterp(xx, yy, zz, arrin, lbox, ngrid):
 
 # ********************************
 @njit(parallel=True, fastmath=True, cache=True)
-def real_to_redshift_space(delta, vz, ngrid, lbox, bv, bb, betarsd, gamma):
+def real_to_redshift_space(delta, vz, ngrid, lbox, biaspars):
 
     lcell = lbox/ ngrid
 
@@ -211,6 +200,14 @@ def real_to_redshift_space(delta, vz, ngrid, lbox, bv, bb, betarsd, gamma):
                 indz = int(ztmp/lcell)
                 
                 ind3d = indz+ngrid*(indy+ngrid*indx)
+
+                tind = int(tweb[ii,jj,kk]-1)
+                dind = int(twebdelta[ii,jj,kk]-1)
+
+                bv = biaspars[tind,dind,4]
+                bb = biaspars[tind,dind,5]
+                betarsd = biaspars[tind,dind,6]
+                gamma = 1
                 
                 sigma = bb*(1. + delta[indx,indy,indz])**betarsd
                 vzrand = np.random.normal(0,sigma)
@@ -437,7 +434,7 @@ def biasmodel_withnorm(ngrid, lbox, delta, tweb, twebdelta, nmean, alpha, beta, 
 # ************************************************
 
 @njit(parallel=True, cache=True, fastmath=True)
-def biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv):
+def biasmodel(ngrid, lbox, delta, tweb, twebdelta, biaspars):
 
     # Allocate tracer field (may be replaced with delta if too memory consuming)
     flux = np.zeros((ngrid,ngrid,ngrid))
@@ -448,13 +445,16 @@ def biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv,
         for jj in range(ngrid):
             for kk in range(ngrid):
 
-                if tweb[ii,jj,kk]==twebenv and twebdelta[ii,jj,kk]==twebdeltaenv:
-                    
-                    tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-(delta[ii,jj,kk]/rho)**eps)
-                    flux[ii,jj,kk] = np.exp(-tau)
+                tind = int(tweb[ii,jj,kk]-1)
+                dind = int(twebdelta[ii,jj,kk]-1)
 
-                else:
-                    flux[ii,jj,kk] = 1.
+                aa = biaspars[tind,dind,0]
+                alpha = biaspars[tind,dind,1]
+                rho = biaspars[tind,dind,2]
+                eps = biaspars[tind,dind,3]
+   
+                tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-(delta[ii,jj,kk]/rho)**eps)
+                flux[ii,jj,kk] = np.exp(-tau)
 
     return flux
 
@@ -548,19 +548,32 @@ def get_cic(posx, posy, posz, lbox, ngrid):
 
 # ********************************
 # ********************************
-def chisquare(xx):
+def chisquare(yy):
+
+    xx = np.reshape(yy, (4,4,int(len(yy)/16)))
 
     # Define the parameters to fit
-    aa = xx[0]
-    alpha = xx[1]
-    rho = xx[2]
-    eps = xx[3]
-    bv = xx[4]
-    bb = xx[5]
-    betarsd = xx[6]
-    gamma = 1.
+    aa11, alpha11, rho11, eps11, bv11, bb11, betarsd11 = xx[0,0,0], xx[0,0,1], xx[0,0,2], xx[0,0,3], xx[0,0,4], xx[0,0,5], xx[0,0,6]
+    aa12, alpha12, rho12, eps12, bv12, bb12, betarsd12 = xx[0,1,0], xx[0,1,1], xx[0,1,2], xx[0,1,3], xx[0,1,4], xx[0,1,5], xx[0,1,6]
+    aa13, alpha13, rho13, eps13, bv13, bb13, betarsd13 = xx[0,2,0], xx[0,2,1], xx[0,2,2], xx[0,2,3], xx[0,2,4], xx[0,2,5], xx[0,2,6]
+    aa14, alpha14, rho14, eps14, bv14, bb14, betarsd14 = xx[0,3,0], xx[0,3,1], xx[0,3,2], xx[0,3,3], xx[0,3,4], xx[0,3,5], xx[0,3,6]
 
-    posxnew, posynew, posznew = real_to_redshift_space(delta, vz, ngrid, lbox, bv, bb, betarsd, gamma)
+    aa21, alpha21, rho21, eps21, bv21, bb21, betarsd21 = xx[1,0,0], xx[1,0,1], xx[1,0,2], xx[1,0,3], xx[1,0,4], xx[1,0,5], xx[1,0,6]
+    aa22, alpha22, rho22, eps22, bv22, bb22, betarsd22 = xx[1,1,0], xx[1,1,1], xx[1,1,2], xx[1,1,3], xx[1,1,4], xx[1,1,5], xx[1,1,6]
+    aa23, alpha23, rho23, eps23, bv23, bb23, betarsd23 = xx[1,2,0], xx[1,2,1], xx[1,2,2], xx[1,2,3], xx[1,2,4], xx[1,2,5], xx[1,2,6]
+    aa24, alpha24, rho24, eps24, bv24, bb24, betarsd24 = xx[1,3,0], xx[1,3,1], xx[1,3,2], xx[1,3,3], xx[1,3,4], xx[1,3,5], xx[1,3,6]
+
+    aa31, alpha31, rho31, eps31, bv31, bb31, betarsd31 = xx[2,0,0], xx[2,0,1], xx[2,0,2], xx[2,0,3], xx[2,0,4], xx[2,0,5], xx[2,0,6]
+    aa32, alpha32, rho32, eps32, bv32, bb32, betarsd32 = xx[2,1,0], xx[2,1,1], xx[2,1,2], xx[2,1,3], xx[2,1,4], xx[2,1,5], xx[2,1,6]
+    aa33, alpha33, rho33, eps33, bv33, bb33, betarsd33 = xx[2,2,0], xx[2,2,1], xx[2,2,2], xx[2,2,3], xx[2,2,4], xx[2,2,5], xx[2,2,6]
+    aa34, alpha34, rho34, eps34, bv34, bb34, betarsd34 = xx[2,3,0], xx[2,3,1], xx[2,3,2], xx[2,3,3], xx[2,3,4], xx[2,3,5], xx[2,3,6]
+
+    aa41, alpha41, rho41, eps41, bv41, bb41, betarsd41 = xx[3,0,0], xx[3,0,1], xx[3,0,2], xx[3,0,3], xx[3,0,4], xx[3,0,5], xx[3,0,6]
+    aa42, alpha42, rho42, eps42, bv42, bb42, betarsd42 = xx[3,1,0], xx[3,1,1], xx[3,1,2], xx[3,1,3], xx[3,1,4], xx[3,1,5], xx[3,1,6]
+    aa43, alpha43, rho43, eps43, bv43, bb43, betarsd43 = xx[3,2,0], xx[3,2,1], xx[3,2,2], xx[3,2,3], xx[3,2,4], xx[3,2,5], xx[3,2,6]
+    aa44, alpha44, rho44, eps44, bv44, bb44, betarsd44 = xx[3,3,0], xx[3,3,1], xx[3,3,2], xx[3,3,3], xx[3,3,4], xx[3,3,5], xx[3,3,6]
+
+    posxnew, posynew, posznew = real_to_redshift_space(delta, vz, ngrid, lbox, xx)
 
     # Periodic BCs
     posxnew[posxnew<0.] += lbox
@@ -573,11 +586,9 @@ def chisquare(xx):
     delta_new = get_cic(posxnew, posynew, posznew, lbox, ngrid)
     delta_new = delta_new/np.mean(delta_new) - 1.
 
-    flux_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
-    flux_new_mask = np.ones((ngrid,ngrid,ngrid))
-    flux_new_mask[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)] = flux_new[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)]
+    flux_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, xx)
 
-    kk, pk_l0, pk_l2, pk_l4 = measure_spectrum(flux_new_mask)
+    kk, pk_l0, pk_l2, pk_l4 = measure_spectrum(flux_new)
 
     chisq_l0 = np.sum((pk_l0[np.where(kk<kkth_l0)]/pkref_l0[np.where(kk<kkth_l0)] - 1.)**2)/len(pk_l0[np.where(kk<kkth_l0)])
     chisq_l2 = np.sum((pk_l2[np.where(kk<kkth_l2)]/pkref_l2[np.where(kk<kkth_l2)] - 1.)**2)/len(pk_l2[np.where(kk<kkth_l2)])
@@ -795,6 +806,22 @@ def get_tidal_invariants(arr, ngrid, lbox):
 
 parslist = []
 
+bestfitpars = np.load(inpars_filename)
+
+npars = int(len(bestfitpars))
+
+boundslist = []
+
+for ii in range(len(bestfitpars)):
+
+    bnd = ((1-bounds_range)*bestfitpars[ii], (1+bounds_range)*bestfitpars[ii])
+    boundslist.append(bnd)
+
+bounds = np.array(boundslist)#, dth_bounds, rhoeps_bounds, eps_bounds])
+#bestfit = np.array([1., 1., 1., 1., 1., 1., 1. ]) # z=3.0
+
+bestfitpars = np.reshape(bestfitpars, (4,4,int(len(bestfitpars)/16)))
+
 if fit==True:
     plot_pk = False
 else:
@@ -818,9 +845,10 @@ phi = poisson_solver(delta,ngrid, lbox)
 # Compute T-web in real space
 print('Computing invariants of tidal field ...')
 tweb = get_tidal_invariants(phi, ngrid, lbox)
+twebdelta = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in redshift space
 
 # Map density field from real to redshift space
-posx, posy, posz = real_to_redshift_space(delta, vz, ngrid, lbox, -0.9, 2.0, 0.5, 1.0) # Now delta is in redshift space
+posx, posy, posz = real_to_redshift_space(delta, vz, ngrid, lbox, bestfitpars) # Now delta is in redshift space
 # Periodic BCs
 posz[posz<0.] += lbox
 posz[posz>=lbox] -= lbox
@@ -837,23 +865,17 @@ phi = poisson_solver(delta,ngrid, lbox)
 print('Computing invariants of tidal field ...')
 tweb = get_tidal_invariants(phi, ngrid, lbox) # Now also the T-web is in redshift space
 twebdelta = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in redshift space
+        
+        
+meandens = np.sum(fluxref)/lbox**3
 
-for twebenv in twebenvs:
-    for twebdeltaenv in twebdeltaenvs:          
+print('=========================')
+print('Fitting ...')
         
-        meandens = np.sum(fluxref[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)])/lbox**3
-
-        print('=========================')
-        print('Fitting %d %d ...' %(twebenv, twebdeltaenv))
+kkref, pkref_l0, pkref_l2, pkref_l4 = measure_spectrum(fluxref)
         
-        fluxref_mask = np.zeros((ngrid,ngrid,ngrid))
-        fluxref_mask[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)] = fluxref[np.logical_and(tweb==twebenv,twebdelta==twebdeltaenv)]
-        
-        kkref, pkref_l0, pkref_l2, pkref_l4 = measure_spectrum(fluxref_mask)
-        
-        # Fit
-        print('Fitting ...')
-        algorithm_param = {'max_num_iteration': 100,
+# Fit
+algorithm_param = {'max_num_iteration': 100,
                    'population_size':100,
                    'mutation_probability':0.1,
                    'elit_ratio': 0.01,
@@ -862,30 +884,15 @@ for twebenv in twebenvs:
                    'crossover_type':'uniform',
                    'max_iteration_without_improv':10}
             
-        model=ga(function=chisquare,dimension=npars,variable_type='real',variable_boundaries=bounds, algorithm_parameters=algorithm_param)
-        model.run()
-        convergence=model.report
-        solution=model.output_dict
+model=ga(function=chisquare,dimension=npars,variable_type='real',variable_boundaries=bounds, algorithm_parameters=algorithm_param)
+model.run()
+convergence=model.report
+solution=model.output_dict
             
-        x0new = solution['variable']
+x0new = solution['variable']
 
-        aa = x0new[0]
-        alpha = x0new[1]
-        rho = x0new[2]
-        eps = x0new[3]
-        bv = x0new[4]
-        bb = x0new[5]
-        betarsd = x0new[6]
+ncounts_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, x0new)
 
-        ncounts_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
+parslist = x0new.flatten()
 
-        parslist.append(aa)
-        parslist.append(alpha)
-        parslist.append(rho)
-        parslist.append(eps)
-        parslist.append(bv)
-        parslist.append(bv)
-        parslist.append(betarsd)
-
-      
 np.save(outpars_filename, parslist)
