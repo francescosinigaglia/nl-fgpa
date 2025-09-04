@@ -581,7 +581,7 @@ def chisquare(xx):
 
     delta_new = get_cic(posxnew, posynew, posznew, lbox, ngrid)
     delta_new = delta_new/np.mean(delta_new) - 1.
-    delta_new[delta_new<.1] = -1. # Regularize delta in case of extreme RSD
+    delta_new[delta_new<-1.] = -1. # Regularize delta in case of extreme RSD
 
     flux_new = biasmodel(ngrid, lbox, delta_new, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
     flux_new_mask = np.ones((ngrid,ngrid,ngrid))
