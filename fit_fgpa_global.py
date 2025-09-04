@@ -192,7 +192,7 @@ def trilininterp(xx, yy, zz, arrin, lbox, ngrid):
 
 # ********************************
 @njit(parallel=True, fastmath=True, cache=True)
-def real_to_redshift_space(delta, vz, ngrid, lbox, biaspars):
+def real_to_redshift_space(delta, vz, ngrid, lbox, biaspars, tweb, twebdelta):
 
     lcell = lbox/ ngrid
 
@@ -568,7 +568,7 @@ def get_cic(posx, posy, posz, lbox, ngrid):
 # ********************************
 def chisquare(xx):
 
-    posxnew, posynew, posznew = real_to_redshift_space(delta, vz, ngrid, lbox, xx)
+    posxnew, posynew, posznew = real_to_redshift_space(delta, vz, ngrid, lbox, xx, tweb, twebdelta)
 
     posznew[posznew<0.] += lbox
     posznew[posznew>=lbox] -= lbox
@@ -861,28 +861,22 @@ tweb = get_tidal_invariants(phi, ngrid, lbox)
 twebdelta = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in redshift space
 
 # Map density field from real to redshift space
-posx, posy, posz = real_to_redshift_space(delta, vz, ngrid, lbox, bestfitpars) # Now delta is in redshift space
+posx, posy, posz = real_to_redshift_space(delta, vz, ngrid, lbox, bestfitpars, tweb, twebdelta) # Now delta is in redshift space
 # Periodic BCs
 posz[posz<0.] += lbox
 posz[posz>=lbox] -= lbox
 
-delta = get_cic(posx, posy, posz, lbox, ngrid)
-print('DELTA CIC')
-print(delta)
-delta = delta/np.mean(delta) - 1.
-print(delta.shape)
-print(len(delta[np.isnan(delta)==True]), len(delta[np.isinf(delta)==True]))
-print('HERE')
-print(delta)
+deltad = get_cic(posx, posy, posz, lbox, ngrid)
+deltad = deltad/np.mean(deltad) - 1.
 
 # Solve Poisson equation in redshift space
 print('Solving Poisson equation ...')
-phi = poisson_solver(delta,ngrid, lbox) 
+phid = poisson_solver(deltad,ngrid, lbox)
 
 # Compute T-web in redshift space
 print('Computing invariants of tidal field ...')
-tweb = get_tidal_invariants(phi, ngrid, lbox) # Now also the T-web is in redshift space
-twebdelta = get_tidal_invariants(delta, ngrid, lbox) # Now also the T-web is in redshift space
+tweb = get_tidal_invariants(phid, ngrid, lbox) # Now also the T-web is in redshift space
+twebdelta = get_tidal_invariants(deltad, ngrid, lbox) # Now also the T-web is in redshift space
         
         
 meandens = np.sum(fluxref)/lbox**3
