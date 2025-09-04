@@ -21,10 +21,10 @@ vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 #out_filename = '...' 
 outpars_filename = 'bestfit_pars.npy'
 
-twebenvs = [1,2,3,4] # CW environments for the gravitational tidal field tensor (T-web)
-twebdeltaenvs = [12,3,4] # CW environments for the curvature tensor (delta-web)
+twebenvs = [2] # CW environments for the gravitational tidal field tensor (T-web)
+twebdeltaenvs = [2] # CW environments for the curvature tensor (delta-web)
 
-verbose_parameters = False
+verbose_parameters = True
 
 # Power spectrum multipoles computation
 mumin = 0.
@@ -35,20 +35,22 @@ weight_l2 = 1.
 kkth_l0 = 1.0
 kkth_l2 = 0.3
 
-aa_bounds = (0.1, 1.)
+aa_bounds = (0.1, 2.)
 alpha_bounds = (0.01, 3.)
-rho_bounds = (0.1, 2.)
-eps_bounds = (-3., 3.)
-bv_bounds = (-1.2, -0.8)
-bb_bounds = (0.5, 2.)
-beta_bounds = (0.5, 1.5)
+rho_bounds = (1e-5, 20.)
+eps_bounds = (-3, 3)
+bv_bounds = (-1.5, 1.5)
+bb_bounds = (0.1, 1.5)
+beta_bounds = (0.1, 1.5)
+
+# Nan: 22, 24, 43
 
 npars = 7
 
 bounds = np.array([aa_bounds, alpha_bounds, rho_bounds, eps_bounds, bv_bounds, bb_bounds, beta_bounds])#, dth_bounds, rhoeps_bounds, eps_bounds])
 bestfit = np.array([ 0.83483194,  1.03216506,  1.64145321, -2.86247334, -1.15286649,  1.87171906,  0.90479355]) # z=3.0
 
-fit = False
+fit = True
 
 prec = np.float64
 
@@ -448,15 +450,18 @@ def biasmodel(ngrid, lbox, delta, tweb, twebdelta, aa, alpha, rho, eps, twebenv,
 
     # FIRST LOOP: deterministic bias
     # Parallelize the outer loop
+
+    cnt = 0
+
     for ii in prange(ngrid):
         for jj in range(ngrid):
             for kk in range(ngrid):
 
                 if tweb[ii,jj,kk]==twebenv and twebdelta[ii,jj,kk]==twebdeltaenv:
                     
-                    tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-((1.+delta[ii,jj,kk])/rho)**eps)
+                    tau = aa * (1.+delta[ii,jj,kk])**alpha * np.exp(-((1.+delta[ii,jj,kk])/rho)**eps)
                     flux[ii,jj,kk] = np.exp(-tau)
-
+ 
                 else:
                     flux[ii,jj,kk] = 1.
 
@@ -576,6 +581,7 @@ def chisquare(xx):
 
     delta_new = get_cic(posxnew, posynew, posznew, lbox, ngrid)
     delta_new = delta_new/np.mean(delta_new) - 1.
+    delta_new[delta_new<.1] = -1. # Regularize delta in case of extreme RSD
 
     flux_new = biasmodel(ngrid, lbox, delta_new, tweb, twebdelta, aa, alpha, rho, eps, twebenv, twebdeltaenv)
     flux_new_mask = np.ones((ngrid,ngrid,ngrid))
@@ -590,6 +596,8 @@ def chisquare(xx):
 
     if verbose_parameters == True:
         print('PARS: ', xx)
+        print('Pk_mock:', pk_l0[np.where(kk<kkth_l0)])
+        print('Pk_ref:', pkref_l0[np.where(kk<kkth_l0)])
         print('Monopole ratios (%): ', (pk_l0[np.where(kk<kkth_l0)]/pkref_l0[np.where(kk<kkth_l0)] - 1.)*100.)
         #print('Quadrupole ratios (%): ', (pk_l2[np.where(kk<kkth_l2)]/pkref_l2[np.where(kk<kkth_l2)] - 1.)*100.)
         print('----------------------------------------------')

@@ -22,7 +22,7 @@ vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 inpars_filename = 'bestfit_pars.npy'
 outpars_filename = 'bestfit_pars_global.npy'
 
-verbose_parameters = False
+verbose_parameters = True
 
 npars_fit = 7
 
@@ -40,6 +40,26 @@ kkth_l2 = 0.3
 fit = True
 
 prec = np.float64
+
+bestfitpars = np.array([0.94751134,  2.52947513,  1.27392847,  2.77750182, -1.16317768,  1.19494776,
+  1.11425187,  0.73399542,  2.53699339,  0.79446949, -0.84672741, -1.16896156,
+  1.04437109,  1.24908132,  0.57547661,  2.74574982,  0.18465996, -0.22360786,
+ -0.95932143, 1.37936961,  0.94014835,  0.89994835,  0.04155323,  0.61242797,
+ -1.24038072, -1.02868067,  0.51231081,  1.45416581,  0.22225746,  2.21596223,
+  1.171123,   -1.47339887, -0.81388525,  0.79135477,  0.71414676,  0.95587264,
+  0.06279241,  1.23681469, -0.64699772, -0.9261607,   0.56037179,  1.3017642,
+  0.47895643,  1.46859723,  0.87982179, -0.11557776, -0.85599042,  1.41481021,
+  1.44282448,  0.45457599,  0.45658751,  1.54986161, -1.29567744, -1.06592827,
+  1.16753273,  0.97069674,  0.95294609,  1.1731041,   0.13789482, -2.27860798,
+ -1.13303248,  1.79504435,  1.09177257,  0.59339331,  2.186666,    1.66855235,
+  0.33534028, -1.12479985,  1.87127356,  1.02226103,  0.11212326,  0.44691641,
+  0.16583423,  1.22253982, -0.86756585,  1.18052243,  0.89830584,  0.73554074,
+  2.68599097,  0.11869612, -1.01846159, -0.81540468,  0.81751922,  0.92826744,
+  0.39116137,  0.11745009,  1.04091355, -0.21064867, -0.92928963,  0.87967444,
+  1.35090947,  0.60251369,  0.32063194,  1.1976148,   2.97142581, -1.18514715,
+  0.92095716,  1.21262305,  0.6756818,   0.88196743,  1.25716553, -2.04304172,
+ -1.04625502,  1.76776177,  0.81013128,  0.2561832,   1.30842487,  0.5750175,
+ -0.40312417, -0.8749593,   1.41674436,  0.62878114])
 
 
 # ***********************************
@@ -201,12 +221,14 @@ def real_to_redshift_space(delta, vz, ngrid, lbox, biaspars):
                 
                 ind3d = indz+ngrid*(indy+ngrid*indx)
 
-                tind = int(tweb[ii,jj,kk]-1)
-                dind = int(twebdelta[ii,jj,kk]-1)
+                bvind = 1#int(int(tweb[ii,jj,kk]-1)* + ngrid*(int(twebdelta[ii,jj,kk]-1) + ngrid*4))
+                bbind = 1#int(int(tweb[ii,jj,kk]-1)* + ngrid*(int(twebdelta[ii,jj,kk]-1) + ngrid*5))
+                betaind = 1#int(int(tweb[ii,jj,kk]-1)* + ngrid*(int(twebdelta[ii,jj,kk]-1) + ngrid*6))
 
-                bv = biaspars[tind,dind,4]
-                bb = biaspars[tind,dind,5]
-                betarsd = biaspars[tind,dind,6]
+                bv = biaspars[bvind]
+                bb = biaspars[bbind]
+                betarsd = biaspars[betaind]
+                
                 gamma = 1
                 
                 sigma = bb*(1. + delta[indx,indy,indz])**betarsd
@@ -445,13 +467,15 @@ def biasmodel(ngrid, lbox, delta, tweb, twebdelta, biaspars):
         for jj in range(ngrid):
             for kk in range(ngrid):
 
-                tind = int(tweb[ii,jj,kk]-1)
-                dind = int(twebdelta[ii,jj,kk]-1)
+                aaind = int(int(tweb[ii,jj,kk]-1)* + ngrid*(int(twebdelta[ii,jj,kk]-1) + ngrid*0))
+                alphaind = int(int(tweb[ii,jj,kk]-1)* + ngrid*(int(twebdelta[ii,jj,kk]-1) + ngrid*1))
+                rhoind = int(int(tweb[ii,jj,kk]-1)* + ngrid*(int(twebdelta[ii,jj,kk]-1) + ngrid*2))
+                epsind = int(int(tweb[ii,jj,kk]-1)* + ngrid*(int(twebdelta[ii,jj,kk]-1) + ngrid*3))
 
-                aa = biaspars[tind,dind,0]
-                alpha = biaspars[tind,dind,1]
-                rho = biaspars[tind,dind,2]
-                eps = biaspars[tind,dind,3]
+                aa = biaspars[aaind]
+                alpha = biaspars[alphaind]
+                rho = biaspars[rhoind]
+                eps = biaspars[epsind]
    
                 tau = aa * (1+delta[ii,jj,kk])**alpha * np.exp(-((1.+delta[ii,jj,kk])/rho)**eps)
                 flux[ii,jj,kk] = np.exp(-tau)
@@ -548,38 +572,40 @@ def get_cic(posx, posy, posz, lbox, ngrid):
 
 # ********************************
 # ********************************
-def chisquare(yy):
+def chisquare(xx):
 
-    xx = np.reshape(yy, (4,4,int(len(yy)/16)))
+    #xx = np.reshape(xx, (4,4,int(len(yy)/16)))
 
     # Define the parameters to fit
-    aa11, alpha11, rho11, eps11, bv11, bb11, betarsd11 = xx[0,0,0], xx[0,0,1], xx[0,0,2], xx[0,0,3], xx[0,0,4], xx[0,0,5], xx[0,0,6]
-    aa12, alpha12, rho12, eps12, bv12, bb12, betarsd12 = xx[0,1,0], xx[0,1,1], xx[0,1,2], xx[0,1,3], xx[0,1,4], xx[0,1,5], xx[0,1,6]
-    aa13, alpha13, rho13, eps13, bv13, bb13, betarsd13 = xx[0,2,0], xx[0,2,1], xx[0,2,2], xx[0,2,3], xx[0,2,4], xx[0,2,5], xx[0,2,6]
-    aa14, alpha14, rho14, eps14, bv14, bb14, betarsd14 = xx[0,3,0], xx[0,3,1], xx[0,3,2], xx[0,3,3], xx[0,3,4], xx[0,3,5], xx[0,3,6]
+    #aa11, alpha11, rho11, eps11, bv11, bb11, betarsd11 = xx[0], xx[1], xx[2], xx[3], xx[0,0,4], xx[0,0,5], xx[0,0,6]
+    #aa12, alpha12, rho12, eps12, bv12, bb12, betarsd12 = xx[0,1,0], xx[0,1,1], xx[0,1,2], xx[0,1,3], xx[0,1,4], xx[0,1,5], xx[0,1,6]
+    #aa13, alpha13, rho13, eps13, bv13, bb13, betarsd13 = xx[0,2,0], xx[0,2,1], xx[0,2,2], xx[0,2,3], xx[0,2,4], xx[0,2,5], xx[0,2,6]
+    #aa14, alpha14, rho14, eps14, bv14, bb14, betarsd14 = xx[0,3,0], xx[0,3,1], xx[0,3,2], xx[0,3,3], xx[0,3,4], xx[0,3,5], xx[0,3,6]
 
-    aa21, alpha21, rho21, eps21, bv21, bb21, betarsd21 = xx[1,0,0], xx[1,0,1], xx[1,0,2], xx[1,0,3], xx[1,0,4], xx[1,0,5], xx[1,0,6]
-    aa22, alpha22, rho22, eps22, bv22, bb22, betarsd22 = xx[1,1,0], xx[1,1,1], xx[1,1,2], xx[1,1,3], xx[1,1,4], xx[1,1,5], xx[1,1,6]
-    aa23, alpha23, rho23, eps23, bv23, bb23, betarsd23 = xx[1,2,0], xx[1,2,1], xx[1,2,2], xx[1,2,3], xx[1,2,4], xx[1,2,5], xx[1,2,6]
-    aa24, alpha24, rho24, eps24, bv24, bb24, betarsd24 = xx[1,3,0], xx[1,3,1], xx[1,3,2], xx[1,3,3], xx[1,3,4], xx[1,3,5], xx[1,3,6]
+    #aa21, alpha21, rho21, eps21, bv21, bb21, betarsd21 = xx[1,0,0], xx[1,0,1], xx[1,0,2], xx[1,0,3], xx[1,0,4], xx[1,0,5], xx[1,0,6]
+    #aa22, alpha22, rho22, eps22, bv22, bb22, betarsd22 = xx[1,1,0], xx[1,1,1], xx[1,1,2], xx[1,1,3], xx[1,1,4], xx[1,1,5], xx[1,1,6]
+    #aa23, alpha23, rho23, eps23, bv23, bb23, betarsd23 = xx[1,2,0], xx[1,2,1], xx[1,2,2], xx[1,2,3], xx[1,2,4], xx[1,2,5], xx[1,2,6]
+    #aa24, alpha24, rho24, eps24, bv24, bb24, betarsd24 = xx[1,3,0], xx[1,3,1], xx[1,3,2], xx[1,3,3], xx[1,3,4], xx[1,3,5], xx[1,3,6]
 
-    aa31, alpha31, rho31, eps31, bv31, bb31, betarsd31 = xx[2,0,0], xx[2,0,1], xx[2,0,2], xx[2,0,3], xx[2,0,4], xx[2,0,5], xx[2,0,6]
-    aa32, alpha32, rho32, eps32, bv32, bb32, betarsd32 = xx[2,1,0], xx[2,1,1], xx[2,1,2], xx[2,1,3], xx[2,1,4], xx[2,1,5], xx[2,1,6]
-    aa33, alpha33, rho33, eps33, bv33, bb33, betarsd33 = xx[2,2,0], xx[2,2,1], xx[2,2,2], xx[2,2,3], xx[2,2,4], xx[2,2,5], xx[2,2,6]
-    aa34, alpha34, rho34, eps34, bv34, bb34, betarsd34 = xx[2,3,0], xx[2,3,1], xx[2,3,2], xx[2,3,3], xx[2,3,4], xx[2,3,5], xx[2,3,6]
+    #aa31, alpha31, rho31, eps31, bv31, bb31, betarsd31 = xx[2,0,0], xx[2,0,1], xx[2,0,2], xx[2,0,3], xx[2,0,4], xx[2,0,5], xx[2,0,6]
+    #aa32, alpha32, rho32, eps32, bv32, bb32, betarsd32 = xx[2,1,0], xx[2,1,1], xx[2,1,2], xx[2,1,3], xx[2,1,4], xx[2,1,5], xx[2,1,6]
+    #aa33, alpha33, rho33, eps33, bv33, bb33, betarsd33 = xx[2,2,0], xx[2,2,1], xx[2,2,2], xx[2,2,3], xx[2,2,4], xx[2,2,5], xx[2,2,6]
+    #aa34, alpha34, rho34, eps34, bv34, bb34, betarsd34 = xx[2,3,0], xx[2,3,1], xx[2,3,2], xx[2,3,3], xx[2,3,4], xx[2,3,5], xx[2,3,6]
 
-    aa41, alpha41, rho41, eps41, bv41, bb41, betarsd41 = xx[3,0,0], xx[3,0,1], xx[3,0,2], xx[3,0,3], xx[3,0,4], xx[3,0,5], xx[3,0,6]
-    aa42, alpha42, rho42, eps42, bv42, bb42, betarsd42 = xx[3,1,0], xx[3,1,1], xx[3,1,2], xx[3,1,3], xx[3,1,4], xx[3,1,5], xx[3,1,6]
-    aa43, alpha43, rho43, eps43, bv43, bb43, betarsd43 = xx[3,2,0], xx[3,2,1], xx[3,2,2], xx[3,2,3], xx[3,2,4], xx[3,2,5], xx[3,2,6]
-    aa44, alpha44, rho44, eps44, bv44, bb44, betarsd44 = xx[3,3,0], xx[3,3,1], xx[3,3,2], xx[3,3,3], xx[3,3,4], xx[3,3,5], xx[3,3,6]
+    #aa41, alpha41, rho41, eps41, bv41, bb41, betarsd41 = xx[3,0,0], xx[3,0,1], xx[3,0,2], xx[3,0,3], xx[3,0,4], xx[3,0,5], xx[3,0,6]
+    #aa42, alpha42, rho42, eps42, bv42, bb42, betarsd42 = xx[3,1,0], xx[3,1,1], xx[3,1,2], xx[3,1,3], xx[3,1,4], xx[3,1,5], xx[3,1,6]
+    #aa43, alpha43, rho43, eps43, bv43, bb43, betarsd43 = xx[3,2,0], xx[3,2,1], xx[3,2,2], xx[3,2,3], xx[3,2,4], xx[3,2,5], xx[3,2,6]
+    #aa44, alpha44, rho44, eps44, bv44, bb44, betarsd44 = xx[3,3,0], xx[3,3,1], xx[3,3,2], xx[3,3,3], xx[3,3,4], xx[3,3,5], xx[3,3,6]
+
+    #yy = np.reshape(xx, (4,4,7))
 
     posxnew, posynew, posznew = real_to_redshift_space(delta, vz, ngrid, lbox, xx)
 
     # Periodic BCs
-    posxnew[posxnew<0.] += lbox
-    posxnew[posxnew>=lbox] -= lbox
-    posynew[posynew<0.] += lbox
-    posynew[posynew>=lbox] -= lbox
+    #posxnew[posxnew<0.] += lbox
+    #posxnew[posxnew>=lbox] -= lbox
+    #posynew[posynew<0.] += lbox
+    #posynew[posynew>=lbox] -= lbox
     posznew[posznew<0.] += lbox
     posznew[posznew>=lbox] -= lbox
 
@@ -807,16 +833,45 @@ def get_tidal_invariants(arr, ngrid, lbox):
 
 parslist = []
 
-bestfitpars = np.load(inpars_filename)
+#bestfitpars = np.load(inpars_filename)
+
+#bestfitparss = np.zeros((4,4,7))
+#for ii in range(4):
+#    for jj in range(4):
+#        bestfitparss[ii,jj,:] = bestfitpars
+
+#bestfitpars = bestfitparss.flatten()
 
 npars = int(len(bestfitpars))
 
 boundslist = []
 
+aa_bounds = (0.1, 1.)
+alpha_bounds = (0.01, 3.)
+rho_bounds = (0.1, 2.)
+eps_bounds = (-3., 3.)
+bv_bounds = (-1.2, -0.8)
+bb_bounds = (0.5, 2.)
+beta_bounds = (0.5, 1.5)
+
+"""
 for ii in range(len(bestfitpars)):
 
     bnd = ((1-bounds_range)*bestfitpars[ii], (1+bounds_range)*bestfitpars[ii])
     boundslist.append(bnd)
+"""
+
+for ii in range(16):
+
+    #bnd = ((1-bounds_range)*bestfitpars[ii], (1+bounds_range)*bestfitpars[ii])
+    boundslist.append(aa_bounds)
+    boundslist.append(alpha_bounds)
+    boundslist.append(rho_bounds)
+    boundslist.append(eps_bounds)
+    boundslist.append(bv_bounds)
+    boundslist.append(bb_bounds)
+    boundslist.append(beta_bounds)
+
 
 bounds = np.array(boundslist)#, dth_bounds, rhoeps_bounds, eps_bounds])
 #bestfit = np.array([1., 1., 1., 1., 1., 1., 1. ]) # z=3.0
