@@ -12,7 +12,7 @@ zstring = '2.000'
 ngrid = 256
 lbox = 500.
 
-lambdath = 0. # Eigenalues threshold for cosmic web classification
+lambdath = 0. # Eigenvalues threshold for cosmic web classification
 
 dm_filename = 'DensityDM.z2_0.sim2.n256.rspace.dat' 
 flux_filename = 'fluxz.z2_0.sim2.n256.zspace.dat'
@@ -54,6 +54,21 @@ fit = True
 
 prec = np.float64
 
+h = 0.6774
+H0 = 100
+Om = 0.3089
+Orad = 0.
+Ok = 0.
+N_eff = 3.046
+w_eos = -1
+Ol = 1-Om-Ok-Orad
+aa = 1./(1.+redshift)
+num_part_per_cell = 8
+
+lambdath = 0.1 
+
+ascale = 1/(1.+redshift)
+HH = H0*np.sqrt(Om*(1+redshift)**3 + Ol)
 
 # ***********************************
 # ***********************************
@@ -225,7 +240,7 @@ def real_to_redshift_space(delta, vz, ngrid, lbox, bv, bb, betarsd, gamma):
         
                 vztmp += vzrand
 
-                ztmp = ztmp + bv * vztmp #/ (ascale * HH)
+                ztmp = ztmp + bv * vztmp / (ascale * HH)
 
                 if ztmp<0:
                     ztmp += lbox
