@@ -577,7 +577,7 @@ def chisquare(xx):
     delta_new = delta_new/np.mean(delta_new) - 1.
     delta_new[delta_new<-1.] = -1.
 
-    flux_new = biasmodel(ngrid, lbox, delta_new, tweb, twebdelta, xx)
+    flux_new = biasmodel(ngrid, lbox, delta_new, ztweb, ztwebdelta, xx)
 
     kk, pk_l0, pk_l2, pk_l4 = measure_spectrum(flux_new)
 
@@ -866,20 +866,17 @@ posx, posy, posz = real_to_redshift_space(delta, vz, ngrid, lbox, bestfitpars, t
 posz[posz<0.] += lbox
 posz[posz>=lbox] -= lbox
 
-deltad = get_cic(posx, posy, posz, lbox, ngrid)
-deltad = deltad/np.mean(deltad) - 1.
+zdelta = get_cic(posx, posy, posz, lbox, ngrid)
+zdelta = zdelta/np.mean(zdelta) - 1.
 
 # Solve Poisson equation in redshift space
 print('Solving Poisson equation ...')
-phid = poisson_solver(deltad,ngrid, lbox)
+zphi = poisson_solver(zdelta,ngrid, lbox)
 
 # Compute T-web in redshift space
 print('Computing invariants of tidal field ...')
-tweb = get_tidal_invariants(phid, ngrid, lbox) # Now also the T-web is in redshift space
-twebdelta = get_tidal_invariants(deltad, ngrid, lbox) # Now also the T-web is in redshift space
-        
-        
-meandens = np.sum(fluxref)/lbox**3
+ztweb = get_tidal_invariants(zphi, ngrid, lbox) # Now also the T-web is in redshift space
+ztwebdelta = get_tidal_invariants(zdelta, ngrid, lbox) # Now also the T-web is in redshift space       
         
 kkref, pkref_l0, pkref_l2, pkref_l4 = measure_spectrum(fluxref)
 
