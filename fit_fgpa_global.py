@@ -912,7 +912,7 @@ if fit == True:
 
 else:
 
-    x0new = np.load(outpars_filename)
-    x0new = np.reshape(x0new,(4,4,int(len(x0new)/16)))
+    x0new = bestfitpars #np.load(outpars_filename)
+    #x0new = np.reshape(x0new,(4,4,int(len(x0new)/16)))
 
     chisquare(x0new)
