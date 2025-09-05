@@ -16,7 +16,8 @@ out_filename = 'flux_mock.npy'  # Output filename
 kk_out_filename = 'kk_flux_mock.npy' # k wavenumbers output filename for P(k)
 pk_out_filename = 'pk_flux_mock-npy' # amplitude output filename for P(k)
 
-inpars_filename = 'bestfit_pars_global.npy'
+inpars_filename = 'bestfit_pars.npy'
+inpars_global_filename = 'bestfit_pars_global.npy'
 
 lbox = 500
 ngrid = 256 
@@ -708,6 +709,7 @@ def get_overdensity(delta, ngrid):
 # **********************************************
 
 bestfitpars = np.load(inpars_filename)
+bestfitpars_global = np.load(inpars_global_filename)
 
 lcell = lbox/ngrid
 
@@ -725,8 +727,6 @@ vz = np.reshape(vz, (ngrid,ngrid,ngrid))
 # Convert DM field to overdensity
 delta = delta/np.mean(delta) - 1.
 delta = np.reshape(delta, (ngrid,ngrid,ngrid))
-
-
 
 # Solve Poisson equation in real space
 print('Solving Poisson equation in real space ...')
@@ -779,7 +779,7 @@ print('===================')
 
 # Compute NL FGPA
 print('Computing flux using NL FGPA ...')
-flux_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, bestfitpars)
+flux_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, bestfitpars_global)
 print('... done!')
 print('')
 
