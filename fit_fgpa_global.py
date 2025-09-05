@@ -18,11 +18,13 @@ dm_filename = 'DensityDM.z2_0.sim2.n256.rspace.dat'
 flux_filename = 'fluxz.z2_0.sim2.n256.zspace.dat'
 vz_filename = 'Velocity_z.z2_0.sim2.n256.dat'
 
+out_flux_filename = 'flux_mock.npy'
+
 #out_filename = '...' 
 inpars_filename = 'bestfit_pars.npy'
 outpars_filename = 'bestfit_pars_global.npy'
 
-verbose_parameters = True
+verbose_parameters = False
 
 npars_fit = 7
 
@@ -37,7 +39,7 @@ weight_l2 = 1.
 kkth_l0 = 1.0
 kkth_l2 = 0.3
 
-fit = True
+fit = False
 
 prec = np.float64
 
@@ -578,6 +580,9 @@ def chisquare(xx):
     delta_new[delta_new<-1.] = -1.
 
     flux_new = biasmodel(ngrid, lbox, delta_new, ztweb, ztwebdelta, xx)
+
+    if fit == False:
+        np.save(out_flux_filename, flux_new)
 
     kk, pk_l0, pk_l2, pk_l4 = measure_spectrum(flux_new)
 

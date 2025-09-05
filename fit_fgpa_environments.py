@@ -24,7 +24,7 @@ outpars_filename = 'bestfit_pars.npy'
 twebenvs = [2] # CW environments for the gravitational tidal field tensor (T-web)
 twebdeltaenvs = [2] # CW environments for the curvature tensor (delta-web)
 
-verbose_parameters = True
+verbose_parameters = False
 
 # Power spectrum multipoles computation
 mumin = 0.
@@ -42,8 +42,6 @@ eps_bounds = (-3, 3)
 bv_bounds = (-1.5, 1.5)
 bb_bounds = (0.1, 1.5)
 beta_bounds = (0.1, 1.5)
-
-# Nan: 22, 24, 43
 
 npars = 7
 
@@ -64,8 +62,6 @@ w_eos = -1
 Ol = 1-Om-Ok-Orad
 aa = 1./(1.+redshift)
 num_part_per_cell = 8
-
-lambdath = 0.1 
 
 ascale = 1/(1.+redshift)
 HH = H0*np.sqrt(Om*(1+redshift)**3 + Ol)
