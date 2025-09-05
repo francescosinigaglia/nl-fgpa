@@ -216,7 +216,7 @@ def get_cic(posx, posy, posz, lbox, ngrid):
         delta[indxl,indyc,indzl] += wxl*wyc*wzl
         delta[indxl,indyl,indzl] += wxl*wyl*wzl
 
-    delta = delta/np.mean(delta) - 1.
+    #delta = delta/np.mean(delta) - 1.
 
     return delta
 
@@ -687,6 +687,23 @@ def get_tidal_invariants(arr, ngrid, lbox):
     return tweb
 
 # **********************************************
+@njit(parallel=True, cache=True, fastmath=True)
+def get_overdensity(delta, ngrid):
+
+    mean = np.mean(delta)
+
+    for ii in prange(ngrid):
+        for jj in range(ngrid):
+            for kk in range(ngrid):
+
+                delta[ii,jj,kk] = delta[ii,jj,kk]/mean - 1.
+                if delta[ii,jj,kk] < -1.: # Safety flag
+                    delta[ii,jj,kk] = -1.
+
+    return delta
+
+
+# **********************************************
 # **********************************************
 # **********************************************
 
@@ -726,9 +743,13 @@ print('')
 
 # Map density field from real to redshift space
 print('Mapping from real to redshift space ...')
-delta = real_to_redshift_space(delta, vz, ngrid, lbox, bestfitpars, tweb, twebdelta)
+posx, posy ,posz = real_to_redshift_space(delta, vz, ngrid, lbox, bestfitpars, tweb, twebdelta)
+delta = get_cic(posx, posy, posz, lbox, ngrid)
+delta = get_overdensity(delta, ngrid)
 print('... done!')
 print('')
+
+#print(delta.shape)
 
 # Solve Poisson equation in redshift space
 print('Solving Poisson equation  in redshift space...')
@@ -757,10 +778,13 @@ print('===================')
 """
 
 # Compute NL FGPA
-print('Computing flux using NL FPGA ...')
+print('Computing flux using NL FGPA ...')
 flux_new = biasmodel(ngrid, lbox, delta, tweb, twebdelta, bestfitpars)
 print('... done!')
 print('')
+
+#print(len(flux_new[np.isnan(flux_new)==True]))
+print('Flux diagnostics: (min, max, mean)', np.amin(flux_new), np.amax(flux_new), np.mean(flux_new))
 
 #(flux_new.flatten()).astype('float32').tofile(out_filename)
 np.save(out_filename, flux_new)
