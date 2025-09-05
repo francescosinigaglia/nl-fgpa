@@ -833,13 +833,13 @@ fluxref = np.reshape(fluxref, (ngrid,ngrid,ngrid))
 
 # Do T-web and Tweb-delta computaiton just once
 # Solve Poisson equation in real space
-print('Solving Poisson equation ...')
-phi = poisson_solver(delta,ngrid, lbox) 
+#print('Solving Poisson equation ...')
+#phi = poisson_solver(delta,ngrid, lbox) 
 
 # Compute T-web in real space
-print('Computing invariants of tidal field ...')
-tweb = get_tidal_invariants(phi, ngrid, lbox)
-twebdelta = get_tidal_invariants(delta, ngrid, lbox)
+#print('Computing invariants of tidal field ...')
+#tweb = get_tidal_invariants(phi, ngrid, lbox)
+#twebdelta = get_tidal_invariants(delta, ngrid, lbox)
 
 # Map density field from real to redshift space
 posx, posy, posz = real_to_redshift_space(delta, vz, ngrid, lbox, -0.9, 2.0, 0.5, 1.0) # Now delta is in redshift space
