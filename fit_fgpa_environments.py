@@ -233,7 +233,7 @@ def real_to_redshift_space(delta, vz, ngrid, lbox, bv, bb, betarsd, gamma):
         
                 vztmp += vzrand
 
-                ztmp = ztmp + bv * vztmp / (ascale * HH)
+                ztmp = ztmp + bv * vztmp #/ (ascale * HH)
 
                 if ztmp<0:
                     ztmp += lbox
